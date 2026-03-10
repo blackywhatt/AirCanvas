@@ -124,6 +124,7 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 
 window_name = "Free Draw Module"
 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 maximized = False
 
@@ -224,11 +225,6 @@ while cap.isOpened():
             save_session()
             last_autosave_time = current_time
             autosave_flash_time = current_time
-
-    if not maximized:
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-        maximized = True
 
     key = cv2.waitKey(1) & 0xFF
 

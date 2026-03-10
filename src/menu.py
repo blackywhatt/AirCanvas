@@ -3,14 +3,13 @@ import os
 import subprocess
 import warnings
 import json
-
 # Suppress deprecation warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, 
                              QVBoxLayout, QTextEdit, QHBoxLayout, 
                              QFrame, QGraphicsDropShadowEffect, QListWidget,
-                             QMessageBox, QInputDialog)
+                             QMessageBox, QInputDialog, QProgressDialog)
 from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QEasingCurve
 from PyQt6.QtGui import QFont, QColor
 
@@ -85,7 +84,7 @@ class GuideWindow(QWidget):
         super().__init__()
         self.parent_menu = parent_menu
         self.setWindowTitle("System Documentation")
-        self.showMaximized()
+        self.showFullScreen()
         self.setStyleSheet("background-color: #030305;")
 
         # Main layout for the entire screen
@@ -180,6 +179,46 @@ class GuideWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
+class LoadingScreen(QWidget):
+    def __init__(self, message="Loading..."):
+        super().__init__()
+
+        self.setWindowTitle("AirCanvas Loading")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        title = QLabel("AIR CANVAS")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            font-size: 70pt;
+            font-weight: 900;
+            color: white;
+            letter-spacing: -2px;
+        """)
+
+        msg = QLabel(message)
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setStyleSheet("""
+            font-size: 18pt;
+            color: rgba(255,255,255,0.6);
+            margin-top: 20px;
+        """)
+
+        loading = QLabel("Initializing system...")
+        loading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        loading.setStyleSheet("""
+            font-size: 12pt;
+            color: rgba(255,255,255,0.3);
+            margin-top: 10px;
+        """)
+
+        layout.addWidget(title)
+        layout.addWidget(msg)
+        layout.addWidget(loading)
+
 class MainMenuGUI(QWidget):
     def __init__(self):
         super().__init__()
@@ -242,16 +281,41 @@ class MainMenuGUI(QWidget):
     def show_desktop(self):
         self.showFullScreen()
 
+    def show_loading(self, message="Loading Module..."):
+        loading = QProgressDialog(message, None, 0, 0, self)
+        loading.setWindowTitle("AirCanvas")
+        loading.setWindowModality(Qt.WindowModality.ApplicationModal)
+        loading.setCancelButton(None)
+        loading.setMinimumDuration(0)
+        loading.setStyleSheet("""
+            QProgressDialog {
+                background-color: #030305;
+                color: white;
+                font-size: 14pt;
+            }
+        """)
+        loading.show()
+        QApplication.processEvents()
+        return loading
+
     def start_hand_mode(self):
         self.hide()
         self.hand_module_window = HandModuleWindow(self)
         self.hand_module_window.show()
 
     def start_voice_mode(self):
-        script_path = os.path.join(self.base_path, "voice_mode.py")
+        script_path = os.path.join(self.base_path, "voice_mode", "voice_mode.py")
+
         if os.path.exists(script_path):
+            loading = self.show_loading("Loading Voice Engine...")
+            loading.showFullScreen()
+
             self.hide()
+            QApplication.processEvents()
+
             subprocess.run([sys.executable, script_path])
+
+            loading.close()
             self.show_desktop()
 
     def show_guide(self):
@@ -269,7 +333,7 @@ class HandModuleWindow(QWidget):
         super().__init__()
         self.parent_menu = parent_menu
         self.setWindowTitle("Hand Engine Modules")
-        self.showMaximized()
+        self.showFullScreen()
         self.setStyleSheet("background-color: #030305;")
 
         layout = QVBoxLayout(self)
@@ -325,11 +389,24 @@ class HandModuleWindow(QWidget):
         self.launch_module("solar_mode.py")
 
     def launch_module(self, filename):
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "hand_mode",
+            filename
+        )
+        messages = {
+            "shapes_mode.py": "Loading Shapes Engine...",
+            "draw_mode.py": "Loading Free Draw Canvas...",
+            "solar_mode.py": "Loading Solar System Simulation..."
+        }
+        message = messages.get(filename, "Loading Module...")
         if os.path.exists(script_path):
+            loading = LoadingScreen(message)
+            loading.show()
+            QApplication.processEvents()
             self.hide()
             subprocess.run([sys.executable, script_path])
+            loading.close()
             self.showFullScreen()
 
     def closeEvent(self, event):
@@ -341,7 +418,7 @@ class SessionManagerWindow(QWidget):
         super().__init__()
         self.parent_menu = parent_menu
         self.setWindowTitle("Session Manager")
-        self.showMaximized()
+        self.showFullScreen()
         self.setStyleSheet("background-color: #030305; color: white;")
 
         self.session_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions")
@@ -503,13 +580,13 @@ class SessionManagerWindow(QWidget):
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
         if mode == "free_draw":
-            script = os.path.join(base_dir, "draw_mode.py")
+            script = os.path.join(base_dir, "hand_mode", "draw_mode.py")
 
         elif mode == "shapes":
-            script = os.path.join(base_dir, "shapes_mode.py")
+            script = os.path.join(base_dir, "hand_mode", "shapes_mode.py")
 
         elif mode == "solar":
-            script = os.path.join(base_dir, "solar_mode.py")
+            script = os.path.join(base_dir, "hand_mode", "solar_mode.py")
 
         else:
             print("Unknown session mode")

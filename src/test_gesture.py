@@ -1,5 +1,5 @@
 import cv2
-from gesture_engine import get_gesture
+from hand_mode.gesture_engine import get_gesture
 
 cap = cv2.VideoCapture(0)
 

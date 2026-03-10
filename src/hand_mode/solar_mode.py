@@ -221,6 +221,7 @@ def load_session(filename):
     solar_scale = data.get("solar_scale", 1.0)
     ax = data.get("ax", 0.0)
     ay = data.get("ay", 0.0)
+    
     selected_index = data.get("selected_index", 0)
     simulation_speed = data.get("simulation_speed", 1.0)
 
@@ -242,7 +243,7 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 
 window_name = "Solar System Module"
 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-maximized = False
+cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 # ==============================
 # Main Loop
@@ -650,11 +651,6 @@ while cap.isOpened():
     # Show Frame
     # ==============================
     cv2.imshow(window_name, frame)
-
-    if not maximized:
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-        maximized = True
 
     key = cv2.waitKey(1) & 0xFF
 

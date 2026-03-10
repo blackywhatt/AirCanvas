@@ -4,86 +4,212 @@ import time
 import json
 import os
 import sys
-from gesture_engine import get_gesture
 from datetime import datetime
+from gesture_engine import get_gesture
 from PyQt6.QtWidgets import QApplication, QInputDialog
+from PIL import ImageFont, ImageDraw, Image
 
+# QT APPLICATION INITIALIZATION
 qt_app = QApplication.instance()
 if not qt_app:
     qt_app = QApplication(sys.argv)
 
+# GLOBAL STATE VARIABLES
 rotate_start_angle = None
 shape_start_angle = None
 
 hand_missing_frames = 0
+
 HAND_LOST_TOLERANCE = 3
+
 active_gesture = "none"
 gesture_memory = "none"
 gesture_hold_frames = 0
+
 GESTURE_STABILITY = 3
+
 last_ix, last_iy = 640, 360
 
-#erase indicator
+# ERASE / ANIMATION VARIABLES
 erase_progress = 0
 imploding_shapes = []
 
-#lerp constant
+# INTERPOLATION SETTINGS
 lerp_factor = 0.1
 
+# SELECTION SETTINGS
 SELECTION_RADIUS = 100
 
-#drag variables
+# DRAGGING VARIABLES
 drag_offset = np.array([0, 0])
 is_dragging = False
 
-#gorilla arm effect
+# GORILLA ARM FATIGUE SYSTEM
 fatigue_start_time = None
 fatigue_active = False
-FATIGUE_LIMIT = 60  # seconds to test
+FATIGUE_LIMIT = 60
 fatigue_warning = False
 rest_start_time = None
-REST_DURATION = 10  # seconds to rest
+REST_DURATION = 10
 
+# ROTATION HELPERS
 rotate_start_pos = None
 shape_start_ax = 0
 shape_start_ay = 0
 
-# ==============================
-# SESSION STORAGE
-# ==============================
+# UI ANIMATION
+pulse_frame = 0
+
+# FONT PATH
+FONT_DIR = os.path.join(os.path.dirname(__file__), "..", "fonts")
+
+# MODERN FONT TEXT DRAWING
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w, h = frame.shape[1], frame.shape[0]
+        bbox = draw.textbbox((0,0), text, font=font)
+
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        y = pos[1]
+
+        draw.text((x,y), text, font=font, fill=color)
+
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
+# SESSION STORAGE SYSTEM
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
+
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
 current_session_file = None
 
+# ERASER UI
 def draw_modern_eraser(frame, x, y, progress):
+
     cv2.circle(frame, (x, y), 25, (100, 100, 100), 2, cv2.LINE_AA)
+
     angle = int((progress / 100) * 360)
-    cv2.ellipse(frame, (x, y), (25, 25), -90, 0, angle, (0, 0, 255), 3, cv2.LINE_AA)
 
-def draw_ui_accent(img, active_gesture, depth_val):
-    h, w = img.shape[:2]
-    overlay = img.copy()
-    cv2.rectangle(overlay, (20, 20), (320, 80), (20, 20, 20), -1)
-    cv2.rectangle(overlay, (w-50, 150), (w-20, h-150), (20, 20, 20), -1)
-    cv2.addWeighted(overlay, 0.4, img, 0.6, 0, img)
+    cv2.ellipse(
+        frame,
+        (x, y),
+        (25, 25),
+        -90,
+        0,
+        angle,
+        (0, 0, 255),
+        3,
+        cv2.LINE_AA
+    )
 
-    cv2.putText(img, active_gesture.upper(), (40, 70),
-                cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
+# MAIN UI PANEL
+def draw_ui_accent(frame, active_gesture, depth_val):
 
-    fill_h = int((h - 300) * depth_val)
-    cv2.rectangle(img, (w-45, h-155), (w-25, h-155-fill_h), (0, 255, 255), -1)
+    global pulse_frame
+    pulse_frame += 1
+
+    h, w = frame.shape[:2]
+
+    overlay = frame.copy()
+
+    # modern panel
+    panel_w = 200
+    panel_h = 70
+
+    x1, y1 = 20, 20
+    x2, y2 = x1 + panel_w, y1 + panel_h
+
+    cv2.rectangle(overlay, (x1,y1), (x2,y2), (0,0,0), -1)
+    cv2.addWeighted(overlay, 0.55, frame, 0.45, 0, frame)
+
+    # green accent
+    cv2.rectangle(frame, (x1, y1), (x1+4, y2), (0,255,0), -1)
+
+    gesture_label = "WAITING" if active_gesture == "none" else active_gesture.upper()
+
+    frame = draw_text(
+        frame,
+        "GESTURE",
+        (x1+16, y1+6),
+        16,
+        (160,160,160),
+        "Montserrat-Medium.ttf"
+    )
+
+    frame = draw_text(
+        frame,
+        gesture_label,
+        (x1+16, y1+28),
+        24,
+        (255,255,255),
+        "Orbitron-Bold.ttf"
+    )
+
+    # PULSE INDICATOR
+    pulse_radius = 5 + int(2*np.sin(pulse_frame * 0.2))
+
+    indicator_x = x2 - 18
+    indicator_y = y1 + panel_h // 2
+
+    cv2.circle(frame, (indicator_x, indicator_y), pulse_radius, (0,255,0), -1)
+
+    # DEPTH BAR
+    bar_top = 160
+    bar_bottom = h - 160
+
+    cv2.rectangle(frame, (w-70, bar_top), (w-50, bar_bottom), (35,35,35), -1)
+
+    fill_h = int((bar_bottom - bar_top) * depth_val)
+
+    cv2.rectangle(
+        frame,
+        (w-70, bar_bottom),
+        (w-50, bar_bottom - fill_h),
+        (0,255,0),
+        -1
+    )
+
+    frame = draw_text(
+        frame,
+        "DEPTH",
+        (w-90, bar_top-35),
+        18,
+        (170,170,170),
+        "Montserrat-Medium.ttf"
+    )
+
+    return frame
 
 def draw_mode_title(frame):
     h, w = frame.shape[:2]
-    cv2.putText(frame, "SHAPES MODE",
-                (w//2 - 180, 50),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1.2,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA)
+
+    frame = draw_text(
+        frame,
+        "SHAPES MODE",
+        (w//2 - 250, 20),
+        60,
+        (255,255,255),
+        "Orbitron-Bold.ttf"
+    )
+
+    return frame
 
 def project_3d(x, y, z, w, h, ax, ay):
     cx, cy = x - w//2, y - h//2
@@ -150,7 +276,7 @@ class Polygon(GeometricShape):
         current_pts = self.center + self.relative_points * self.scale_factor
         f_pts = [project_3d(p[0], p[1], -z_val * self.scale_factor, w, h, self.ax, self.ay) for p in current_pts]
 
-        if self.label == "SQUARE":
+        if self.label in ["SQUARE", "RECTANGLE"]:
             b_pts = [project_3d(p[0], p[1], z_val * self.scale_factor, w, h, self.ax, self.ay) for p in current_pts]
             for i in range(4):
                 cv2.line(frame, f_pts[i], f_pts[(i+1)%4], color, thick, cv2.LINE_AA)
@@ -163,6 +289,31 @@ class Polygon(GeometricShape):
                 cv2.line(frame, f_pts[i], f_pts[(i+1)%len(f_pts)], color, thick, cv2.LINE_AA)
                 if self.current_depth > 0.1:
                     cv2.line(frame, f_pts[i], tip, (200, 200, 200), 1, cv2.LINE_AA)
+
+def generate_star(center, outer_r, inner_r=0.5, points=5):
+    cx, cy = center
+    pts = []
+
+    for i in range(points * 2):
+        r = outer_r if i % 2 == 0 else outer_r * inner_r
+        angle = np.pi * i / points - np.pi/2
+        x = cx + r * np.cos(angle)
+        y = cy + r * np.sin(angle)
+        pts.append([x, y])
+
+    return np.array(pts)
+
+def generate_regular_polygon(center, radius, sides):
+    cx, cy = center
+    pts = []
+
+    for i in range(sides):
+        angle = 2 * np.pi * i / sides - np.pi/2
+        x = cx + radius * np.cos(angle)
+        y = cy + radius * np.sin(angle)
+        pts.append([x, y])
+
+    return np.array(pts)
 
 def get_perfect_shape(points):
     if len(points) < 5:
@@ -178,10 +329,42 @@ def get_perfect_shape(points):
         approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
 
         if len(approx) == 3:
-            return Polygon(approx.reshape(-1, 2), "triangle")
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            pts = generate_regular_polygon((x, y), r, 3)
+            return Polygon(pts, "triangle")
+        
         elif len(approx) == 4:
             x, y, w, h = cv2.boundingRect(cnt)
-            return Polygon(np.array([[x, y], [x+w, y], [x+w, y+h], [x, y+h]]), "square")
+
+            aspect_ratio = w / float(h)
+
+            pts = np.array([
+                [x, y],
+                [x+w, y],
+                [x+w, y+h],
+                [x, y+h]
+            ])
+
+            if 0.9 <= aspect_ratio <= 1.1:
+                return Polygon(pts, "square")
+            else:
+                return Polygon(pts, "rectangle")
+        
+        elif len(approx) == 5:
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            pts = generate_regular_polygon((x, y), r, 5)
+            return Polygon(pts, "pentagon")
+        
+        elif len(approx) == 6:
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            pts = generate_regular_polygon((x, y), r, 6)
+            return Polygon(pts, "hexagon")
+
+        elif len(approx) >= 8:
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            pts = generate_star((x, y), r)
+            return Polygon(pts, "star")
+  
         else:
             area = cv2.contourArea(cnt)
             if peri > 0:
@@ -209,6 +392,7 @@ def save_session(session_name=None):
     shapes_data = []
 
     for s in shapes_list:
+
         shape_info = {
             "type": s.label.lower(),
             "center": s.center.tolist(),
@@ -287,7 +471,7 @@ if len(sys.argv) > 2 and sys.argv[1] == "--load":
 
 window_name = "Shapes Module"
 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-maximized = False
+cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -307,12 +491,14 @@ while cap.isOpened():
     else:
         landmarks_present = False
     
-    cv2.putText(frame, f"HAND: {'YES' if landmarks_present else 'NO'}",
-            (20, 180),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 255),
-            2)
+    frame = draw_text(
+        frame,
+        f"Hand: {'Yes' if landmarks_present else 'No'}",
+        (20,100),
+        28,
+        (0,255,0),
+        "Montserrat-Medium.ttf"
+    )
 
     # if no hand detected, cursor stay at center
     if not landmarks_present:
@@ -370,13 +556,15 @@ while cap.isOpened():
     # show active usage timer
     if fatigue_active and not fatigue_warning:
         active_time = int(time.time() - fatigue_start_time)
-        cv2.putText(frame,
-                    f"Active: {active_time}s",
-                    (20, 220),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 255, 0),
-                    2)
+
+        frame = draw_text(
+            frame,
+            f"Active: {active_time}s",
+            (20,130),
+            28,
+            (0,255,0),
+            "Montserrat-Medium.ttf"
+        )
 
     if landmarks_present:
         closest_dist = SELECTION_RADIUS
@@ -506,15 +694,13 @@ while cap.isOpened():
         active_shape = shapes_list[selected_index]
         cx, cy = active_shape.center.astype(int)
 
-        cv2.putText(
+        frame = draw_text(
             frame,
             active_shape.label,
-            (cx - 60, cy - 80),
-            cv2.FONT_HERSHEY_DUPLEX,
-            0.9,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
+            (cx - 70, cy - 100),
+            32,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
         )
 
     for s in imploding_shapes[:]:
@@ -530,55 +716,67 @@ while cap.isOpened():
     if len(current_stroke) > 1:
         cv2.polylines(frame, [np.array(current_stroke, np.int32)], False, (0, 255, 255), 2, cv2.LINE_AA)
 
-    draw_ui_accent(frame, active_gesture, target_depth_ui)
+    frame = draw_ui_accent(frame, active_gesture, target_depth_ui)
 
-    cv2.putText(frame, "Press B to return to menu",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (180, 180, 180),
-            1,
-            cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        "Press B to return to menu",
+        (20, h - 40),
+        28,
+        (180,180,180),
+        "Montserrat-Medium.ttf"
+    )
 
-    draw_mode_title(frame)
+    frame = draw_mode_title(frame)
 
     # ==============================
     # FATIGUE WARNING UI
     # ==============================
     if fatigue_warning:
+
+        # dark overlay
         overlay = frame.copy()
-        cv2.rectangle(overlay, (200, 200), (w-200, h-200), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+        cv2.rectangle(overlay, (0,0), (w,h), (0,0,0), -1)
+        overlay = cv2.GaussianBlur(frame.copy(), (35,35), 0)
+        cv2.addWeighted(overlay, 0.80, frame, 0.20, 0, frame)
 
-        cv2.putText(frame,
-                    "ARM FATIGUE WARNING",
-                    (w//2 - 220, h//2 - 40),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1.0,
-                    (0, 0, 255),
-                    2,
-                    cv2.LINE_AA)
+        center_y = h // 2
 
-        cv2.putText(frame,
-                    "Please rest your arm for 5 seconds",
-                    (w//2 - 260, h//2 + 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
-                    2,
-                    cv2.LINE_AA)
+        # title
+        frame = draw_text(
+            frame,
+            "ARM FATIGUE WARNING",
+            (0, center_y - 60),
+            50,
+            (0,0,200),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
+
+        # message
+        frame = draw_text(
+            frame,
+            "Please rest your arm for 10 seconds",
+            (0, center_y),
+            32,
+            (255,255,255),
+            "Montserrat-Medium.ttf",
+            center=True
+        )
 
         rest_elapsed = time.time() - rest_start_time if rest_start_time else 0
         remaining = max(0, int(REST_DURATION - rest_elapsed))
 
-        cv2.putText(frame,
-                    f"Rest countdown: {remaining}s",
-                    (w//2 - 120, h//2 + 50),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
-                    (0, 255, 255),
-                    2,
-                    cv2.LINE_AA)
+        # countdown
+        frame = draw_text(
+            frame,
+            f"Rest countdown: {remaining}s",
+            (0, center_y + 60),
+            36,
+            (0,0,200),
+            "Montserrat-SemiBold.ttf",
+            center=True
+        )
 
         if remaining == 0:
             fatigue_warning = False
@@ -587,11 +785,6 @@ while cap.isOpened():
             rest_start_time = None
 
     cv2.imshow(window_name, frame)
-
-    if not maximized:
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-        maximized = True
 
     key = cv2.waitKey(1) & 0xFF
 
