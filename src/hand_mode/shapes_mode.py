@@ -94,7 +94,8 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
 
 # SESSION STORAGE SYSTEM
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
+PROJECT_SRC = os.path.dirname(BASE_DIR)
+SESSION_FOLDER = os.path.join(PROJECT_SRC, "sessions")
 
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
@@ -345,7 +346,7 @@ def get_perfect_shape(points):
                 [x, y+h]
             ])
 
-            if 0.9 <= aspect_ratio <= 1.1:
+            if 0.8 <= aspect_ratio <= 1.5:
                 return Polygon(pts, "square")
             else:
                 return Polygon(pts, "rectangle")
@@ -789,6 +790,7 @@ while cap.isOpened():
     key = cv2.waitKey(1) & 0xFF
 
     if key == ord('b'):
+        cv2.destroyWindow(window_name)
         break
 
     # Save session
@@ -809,3 +811,4 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+sys.exit(0)

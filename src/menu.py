@@ -3,6 +3,7 @@ import os
 import subprocess
 import warnings
 import json
+import time
 # Suppress deprecation warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -407,7 +408,13 @@ class HandModuleWindow(QWidget):
             self.hide()
             subprocess.run([sys.executable, script_path])
             loading.close()
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+            self.show()
             self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
 
     def closeEvent(self, event):
         self.parent_menu.show_desktop()
@@ -425,76 +432,170 @@ class SessionManagerWindow(QWidget):
         os.makedirs(self.session_folder, exist_ok=True)
 
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(20)
+        layout.setContentsMargins(120, 60, 120, 60)
+        layout.setSpacing(30)
 
+        # Title
         title = QLabel("SAVED SESSIONS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
-            font-size: 40pt;
+            font-size: 42pt;
             font-weight: 900;
-            letter-spacing: 8px;
+            letter-spacing: 10px;
+            color: white;
         """)
         layout.addWidget(title)
 
+        # Card container
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: rgba(255,255,255,0.04);
+                border-radius: 25px;
+                border: 1px solid rgba(255,255,255,0.08);
+            }
+        """)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(40, 40, 40, 40)
+        card_layout.setSpacing(25)
+
+        # Session list
         self.session_list = QListWidget()
         self.session_list.itemDoubleClicked.connect(self.load_session)
-        self.session_list.setFixedWidth(600)
-        self.session_list.setFixedHeight(400)
+        self.session_list.setMinimumHeight(350)
+
         self.session_list.setStyleSheet("""
             QListWidget {
-                background: rgba(255,255,255,0.05);
-                border-radius: 20px;
-                font-size: 12pt;
-                padding: 10px;
+                background: rgba(255,255,255,0.03);
+                border: none;
+                border-radius: 15px;
+                font-size: 13pt;
+                padding: 12px;
             }
+
             QListWidget::item {
-                padding: 8px;
+                padding: 10px;
+                border-radius: 10px;
             }
+
+            QListWidget::item:hover {
+                background: rgba(255,255,255,0.08);
+            }
+
             QListWidget::item:selected {
                 background: #6366f1;
                 color: white;
-                border-radius: 5px;
             }
         """)
-        layout.addWidget(self.session_list)
 
-        self.refresh_sessions()
+        card_layout.addWidget(self.session_list)
 
-        btn_layout = QHBoxLayout()
+        # Buttons row 1
+        row1 = QHBoxLayout()
 
         self.btn_load = QPushButton("LOAD")
-        self.btn_load.clicked.connect(self.load_session)
-
         self.btn_rename = QPushButton("RENAME")
-        self.btn_rename.clicked.connect(self.rename_session)
-
         self.btn_delete = QPushButton("DELETE")
-        self.btn_delete.clicked.connect(self.delete_session)
+
+        for btn in [self.btn_load, self.btn_rename, self.btn_delete]:
+            btn.setFixedHeight(45)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        row1.addWidget(self.btn_load)
+        row1.addWidget(self.btn_rename)
+        row1.addWidget(self.btn_delete)
+
+        card_layout.addLayout(row1)
+
+        # Buttons row 2
+        row2 = QHBoxLayout()
 
         self.btn_refresh = QPushButton("REFRESH")
-        self.btn_refresh.clicked.connect(self.refresh_sessions)
-
         self.btn_back = QPushButton("BACK")
+
+        # Button cursor
+        for btn in [self.btn_refresh, self.btn_back]:
+            btn.setFixedHeight(45)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Connect buttons
+        self.btn_load.clicked.connect(self.load_session)
+        self.btn_rename.clicked.connect(self.rename_session)
+        self.btn_delete.clicked.connect(self.delete_session)
+        self.btn_refresh.clicked.connect(self.refresh_sessions)
         self.btn_back.clicked.connect(self.close)
 
-        for btn in [self.btn_load, self.btn_rename, self.btn_delete, self.btn_refresh, self.btn_back]:
-            btn.setFixedHeight(50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: white;
-                    color: black;
-                    font-weight: bold;
-                    border-radius: 15px;
-                }
-                QPushButton:hover {
-                    background: #6366f1;
-                    color: white;
-                }
-            """)
-            btn_layout.addWidget(btn)
+        # Button styling
+        self.btn_load.setStyleSheet("""
+        QPushButton {
+            background: #22c55e;
+            color: white;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: #16a34a;
+        }
+        """)
 
-        layout.addLayout(btn_layout)
+        self.btn_rename.setStyleSheet("""
+        QPushButton {
+            background: #6366f1;
+            color: white;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: #4f46e5;
+        }
+        """)
+
+        self.btn_delete.setStyleSheet("""
+        QPushButton {
+            background: #ef4444;
+            color: white;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: #dc2626;
+        }
+        """)
+
+        self.btn_refresh.setStyleSheet("""
+        QPushButton {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        """)
+
+        self.btn_back.setStyleSheet("""
+        QPushButton {
+            background: white;
+            color: black;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background: #6366f1;
+            color: white;
+        }
+        """)
+
+        row2.addWidget(self.btn_refresh)
+        row2.addWidget(self.btn_back)
+
+        card_layout.addLayout(row2)
+
+        layout.addWidget(card)
+
+        self.refresh_sessions()
 
     def refresh_sessions(self):
         self.session_list.clear()
@@ -591,10 +692,17 @@ class SessionManagerWindow(QWidget):
         else:
             print("Unknown session mode")
             return
+        
+        # Show loading screen
+        loading = LoadingScreen("Loading Saved Session...")
+        loading.show()
+        QApplication.processEvents()
 
         self.hide()
 
         subprocess.run([sys.executable, script, "--load", filename])
+
+        loading.close()
 
         self.parent_menu.show_desktop()
 

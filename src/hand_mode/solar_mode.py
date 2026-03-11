@@ -33,7 +33,8 @@ SELECT_DELAY = 15   # frames between selections
 # SESSION STORAGE
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
+PROJECT_SRC = os.path.dirname(BASE_DIR)
+SESSION_FOLDER = os.path.join(PROJECT_SRC, "sessions")
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
 current_session_file = None

@@ -5,7 +5,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 import cv2
 import numpy as np
-from hand_mode.gesture_engine import get_gesture 
+from gesture_engine import get_gesture 
 import json
 import time
 import queue
@@ -121,6 +121,10 @@ with sd.RawInputStream(
 
         gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
 
+        # Only allow draw gesture in this module
+        if gesture not in ["draw"]:
+            gesture = "idle"
+
         # ==============================
         # VOICE COMMAND PROCESSING
         # ==============================
@@ -169,7 +173,7 @@ with sd.RawInputStream(
             if gesture == "draw":
                 current_stroke.append((ix,iy))
 
-            else:
+            elif gesture == "idle":
                 if len(current_stroke) > 2:
                     strokes.append({
                         "points": current_stroke.copy(),
