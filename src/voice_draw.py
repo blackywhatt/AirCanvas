@@ -1,6 +1,5 @@
 import sys
 import os
-# ADD PROJECT ROOT TO PYTHON PATH
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 import cv2
