@@ -61,7 +61,7 @@ shape_start_ay = 0
 pulse_frame = 0
 
 # FONT PATH
-FONT_DIR = os.path.join(os.path.dirname(__file__), "..", "fonts")
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 
 # MODERN FONT TEXT DRAWING
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
@@ -456,359 +456,360 @@ def load_session(filename):
     print(f"[INFO] Shapes session loaded: {filename}")
 
 # main loop
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # better quality on Windows
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-cap.set(cv2.CAP_PROP_FPS, 30)
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # better quality on Windows
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FPS, 30)
 
-shapes_list, current_stroke = [], []
-target_depth_ui = 0.0
-selected_index = -1
-lock_cooldown = 0
+    shapes_list, current_stroke = [], []
+    target_depth_ui = 0.0
+    selected_index = -1
+    lock_cooldown = 0
 
-# auto-load session if launched from menu
-if len(sys.argv) > 2 and sys.argv[1] == "--load":
-    load_session(sys.argv[2])
+    # auto-load session if launched from menu
+    if len(sys.argv) > 2 and sys.argv[1] == "--load":
+        load_session(sys.argv[2])
 
-window_name = "Shapes Module"
-cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    window_name = "Shapes Module"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    frame = cv2.flip(frame, 1)
-    frame = cv2.resize(frame, (1280, 720))
-    h, w, _ = frame.shape
+        frame = cv2.flip(frame, 1)
+        frame = cv2.resize(frame, (1280, 720))
+        h, w, _ = frame.shape
 
-    gesture, index_positions, thumb_positions, hand_count, frame = get_gesture(frame)
+        gesture, index_positions, thumb_positions, hand_count, frame = get_gesture(frame)
 
-    # reconstruct cursor + hand presence
-    if hand_count >= 1:
-        ix, iy = index_positions[0]
-        landmarks_present = True
-    else:
-        landmarks_present = False
-    
-    frame = draw_text(
-        frame,
-        f"Hand: {'Yes' if landmarks_present else 'No'}",
-        (20,100),
-        28,
-        (0,255,0),
-        "Montserrat-Medium.ttf"
-    )
-
-    # if no hand detected, cursor stay at center
-    if not landmarks_present:
-        hand_missing_frames += 1
-
-        if hand_missing_frames < HAND_LOST_TOLERANCE:
-            ix, iy = last_ix, last_iy  # keep cursor stable
+        # reconstruct cursor + hand presence
+        if hand_count >= 1:
+            ix, iy = index_positions[0]
+            landmarks_present = True
         else:
-            active_gesture = "none"    # stop drawing after real loss
-    else:
-        hand_missing_frames = 0
-        last_ix, last_iy = ix, iy
-
-    # gesture smoothing
-    if gesture == gesture_memory:
-        gesture_hold_frames += 1
-    else:
-        gesture_memory = gesture
-        gesture_hold_frames = 0
-
-    if gesture_hold_frames >= GESTURE_STABILITY:
-        active_gesture = gesture_memory
-    else:
-        active_gesture = "none"
-
-    # ==============================
-    # FATIGUE TIMER LOGIC (HAND-BASED)
-    # ==============================
-    hand_present = (landmarks_present)
-
-    if hand_present:
-        if not fatigue_active:
-            fatigue_start_time = time.time()
-            fatigue_active = True
-    else:
-        # hand lowered → full reset
-        fatigue_active = False
-        fatigue_warning = False
-        fatigue_start_time = None
-        rest_start_time = None
-
-    if fatigue_active:
-        elapsed = time.time() - fatigue_start_time
-
-        if elapsed >= FATIGUE_LIMIT:
-            fatigue_warning = True
-            
-            if rest_start_time is None:
-                rest_start_time = time.time()
-
-    # disable interaction during rest
-    if fatigue_warning:
-        active_gesture = "none"
-
-    # show active usage timer
-    if fatigue_active and not fatigue_warning:
-        active_time = int(time.time() - fatigue_start_time)
-
+            landmarks_present = False
+        
         frame = draw_text(
             frame,
-            f"Active: {active_time}s",
-            (20,130),
+            f"Hand: {'Yes' if landmarks_present else 'No'}",
+            (20,100),
             28,
             (0,255,0),
             "Montserrat-Medium.ttf"
         )
 
-    if landmarks_present:
-        closest_dist = SELECTION_RADIUS
-        temp_idx = -1
+        # if no hand detected, cursor stay at center
+        if not landmarks_present:
+            hand_missing_frames += 1
 
-        for i, s in enumerate(shapes_list):
-            dist = np.hypot(s.center[0] - ix, s.center[1] - iy)
-            if dist < closest_dist:
-                closest_dist = dist
-                temp_idx = i
-
-        # Select new shape ONLY when hovering close
-        if temp_idx != -1:
-            selected_index = temp_idx
-
-        if active_gesture == "erase" and selected_index != -1:
-            erase_progress += 6
-            if erase_progress >= 100:
-                target_s = shapes_list.pop(selected_index)
-                imploding_shapes.append(target_s)
-                erase_progress = 0
-                selected_index = -1
+            if hand_missing_frames < HAND_LOST_TOLERANCE:
+                ix, iy = last_ix, last_iy  # keep cursor stable
+            else:
+                active_gesture = "none"    # stop drawing after real loss
         else:
-            erase_progress = max(0, erase_progress - 8)
+            hand_missing_frames = 0
+            last_ix, last_iy = ix, iy
 
-            if selected_index != -1:
-                target_s = shapes_list[selected_index]
-                target_depth_ui = target_s.current_depth
-
-                if active_gesture == "clear" and lock_cooldown == 0:
-                    target_s.is_locked = not target_s.is_locked
-                    lock_cooldown = 20
-
-                if not target_s.is_locked:
-
-                    # ==========================
-                    # TWO-HAND DEPTH CONTROL
-                    # ==========================
-                    if hand_count == 2 and selected_index != -1:
-
-                        (x1, y1), (x2, y2) = index_positions
-                        distance = np.hypot(x1 - x2, y1 - y2)
-
-                        depth_value = np.clip(
-                            np.interp(distance, [80, 350], [0.0, 1.0]),
-                            0, 1
-                        )
-
-                        target_s.current_depth += (depth_value - target_s.current_depth) * lerp_factor
-                        target_depth_ui = target_s.current_depth
-
-                        is_dragging = False
-
-
-                    # ==========================
-                    # MOVE (Grip Pose)
-                    # ==========================
-                    elif active_gesture == "move":
-
-                        if not is_dragging:
-                            drag_offset = target_s.center - np.array([ix, iy])
-                            is_dragging = True
-
-                        target_s.center = np.array([ix, iy]) + drag_offset
-
-                    # ==========================
-                    # RESIZE (Pinch)
-                    # ==========================
-                    elif active_gesture == "resize" and selected_index != -1:
-
-                        tx, ty = thumb_positions[0]
-                        d = np.hypot(tx - ix, ty - iy)
-                        target_s.scale(np.interp(d, [20, 150], [0.5, 3.0]))
-
-                        is_dragging = False
-
-                    # ==========================
-                    # ROTATE
-                    # ==========================   
-                    elif active_gesture == "rotate":
-
-                        if rotate_start_pos is None:
-                            rotate_start_pos = (ix, iy)
-                            shape_start_ax = target_s.ax
-                            shape_start_ay = target_s.ay
-
-                        dx = ix - rotate_start_pos[0]
-                        dy = iy - rotate_start_pos[1]
-
-                        sensitivity = 0.005   # smaller = slower rotation
-
-                        target_s.ay = shape_start_ay + dx * sensitivity
-                        target_s.ax = shape_start_ax + dy * sensitivity
-
-                    if active_gesture != "rotate":
-                        rotate_start_angle = None
-                        shape_start_angle = None
-    
-    # Reset rotate & drag when not active
-    if active_gesture != "rotate":
-        rotate_start_pos = None
-
-    if active_gesture != "move":
-        is_dragging = False
-
-    # drawing (only when hand present and draw gesture)
-    if landmarks_present and active_gesture == "draw":
-        current_stroke.append([ix, iy])
-    else:
-        if len(current_stroke) > 5:
-            s_new = get_perfect_shape(current_stroke)
-            if s_new:
-                shapes_list.append(s_new)
-            # If not valid shape → DO NOTHING
-        current_stroke = []
-
-    if lock_cooldown > 0:
-        lock_cooldown -= 1
-
-    # Draw shapes
-    for i, s in enumerate(shapes_list):
-        is_active = (i == selected_index)
-        s.draw(frame, is_selected=is_active)
-
-    # Draw label ONLY if a shape is selected
-    if selected_index != -1:
-        active_shape = shapes_list[selected_index]
-        cx, cy = active_shape.center.astype(int)
-
-        frame = draw_text(
-            frame,
-            active_shape.label,
-            (cx - 70, cy - 100),
-            32,
-            (255,255,255),
-            "Montserrat-SemiBold.ttf"
-        )
-
-    for s in imploding_shapes[:]:
-        s.scale_factor -= 0.25
-        if s.scale_factor <= 0:
-            imploding_shapes.remove(s)
+        # gesture smoothing
+        if gesture == gesture_memory:
+            gesture_hold_frames += 1
         else:
-            s.draw(frame, is_selected=True)
+            gesture_memory = gesture
+            gesture_hold_frames = 0
 
-    if erase_progress > 0:
-        draw_modern_eraser(frame, ix, iy, erase_progress)
+        if gesture_hold_frames >= GESTURE_STABILITY:
+            active_gesture = gesture_memory
+        else:
+            active_gesture = "none"
 
-    if len(current_stroke) > 1:
-        cv2.polylines(frame, [np.array(current_stroke, np.int32)], False, (0, 255, 255), 2, cv2.LINE_AA)
+        # ==============================
+        # FATIGUE TIMER LOGIC (HAND-BASED)
+        # ==============================
+        hand_present = (landmarks_present)
 
-    frame = draw_ui_accent(frame, active_gesture, target_depth_ui)
-
-    frame = draw_text(
-        frame,
-        "Press B to return to menu",
-        (20, h - 40),
-        28,
-        (180,180,180),
-        "Montserrat-Medium.ttf"
-    )
-
-    frame = draw_mode_title(frame)
-
-    # ==============================
-    # FATIGUE WARNING UI
-    # ==============================
-    if fatigue_warning:
-
-        # dark overlay
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (0,0), (w,h), (0,0,0), -1)
-        overlay = cv2.GaussianBlur(frame.copy(), (35,35), 0)
-        cv2.addWeighted(overlay, 0.80, frame, 0.20, 0, frame)
-
-        center_y = h // 2
-
-        # title
-        frame = draw_text(
-            frame,
-            "ARM FATIGUE WARNING",
-            (0, center_y - 60),
-            50,
-            (0,0,200),
-            "Orbitron-Bold.ttf",
-            center=True
-        )
-
-        # message
-        frame = draw_text(
-            frame,
-            "Please rest your arm for 10 seconds",
-            (0, center_y),
-            32,
-            (255,255,255),
-            "Montserrat-Medium.ttf",
-            center=True
-        )
-
-        rest_elapsed = time.time() - rest_start_time if rest_start_time else 0
-        remaining = max(0, int(REST_DURATION - rest_elapsed))
-
-        # countdown
-        frame = draw_text(
-            frame,
-            f"Rest countdown: {remaining}s",
-            (0, center_y + 60),
-            36,
-            (0,0,200),
-            "Montserrat-SemiBold.ttf",
-            center=True
-        )
-
-        if remaining == 0:
-            fatigue_warning = False
+        if hand_present:
+            if not fatigue_active:
+                fatigue_start_time = time.time()
+                fatigue_active = True
+        else:
+            # hand lowered → full reset
             fatigue_active = False
+            fatigue_warning = False
             fatigue_start_time = None
             rest_start_time = None
 
-    cv2.imshow(window_name, frame)
+        if fatigue_active:
+            elapsed = time.time() - fatigue_start_time
 
-    key = cv2.waitKey(1) & 0xFF
+            if elapsed >= FATIGUE_LIMIT:
+                fatigue_warning = True
+                
+                if rest_start_time is None:
+                    rest_start_time = time.time()
 
-    if key == ord('b'):
-        cv2.destroyWindow(window_name)
-        break
+        # disable interaction during rest
+        if fatigue_warning:
+            active_gesture = "none"
 
-    # Save session
-    if key == ord('s'):
+        # show active usage timer
+        if fatigue_active and not fatigue_warning:
+            active_time = int(time.time() - fatigue_start_time)
 
-        if current_session_file is not None:
-            save_session()
-
-        else:
-            name, ok = QInputDialog.getText(
-                None,
-                "Save Shapes Session",
-                "Enter session name:"
+            frame = draw_text(
+                frame,
+                f"Active: {active_time}s",
+                (20,130),
+                28,
+                (0,255,0),
+                "Montserrat-Medium.ttf"
             )
 
-            if ok and name:
-                save_session(name)
+        if landmarks_present:
+            closest_dist = SELECTION_RADIUS
+            temp_idx = -1
 
-cap.release()
-cv2.destroyAllWindows()
-sys.exit(0)
+            for i, s in enumerate(shapes_list):
+                dist = np.hypot(s.center[0] - ix, s.center[1] - iy)
+                if dist < closest_dist:
+                    closest_dist = dist
+                    temp_idx = i
+
+            # Select new shape ONLY when hovering close
+            if temp_idx != -1:
+                selected_index = temp_idx
+
+            if active_gesture == "erase" and selected_index != -1:
+                erase_progress += 6
+                if erase_progress >= 100:
+                    target_s = shapes_list.pop(selected_index)
+                    imploding_shapes.append(target_s)
+                    erase_progress = 0
+                    selected_index = -1
+            else:
+                erase_progress = max(0, erase_progress - 8)
+
+                if selected_index != -1:
+                    target_s = shapes_list[selected_index]
+                    target_depth_ui = target_s.current_depth
+
+                    if active_gesture == "clear" and lock_cooldown == 0:
+                        target_s.is_locked = not target_s.is_locked
+                        lock_cooldown = 20
+
+                    if not target_s.is_locked:
+
+                        # ==========================
+                        # TWO-HAND DEPTH CONTROL
+                        # ==========================
+                        if hand_count == 2 and selected_index != -1:
+
+                            (x1, y1), (x2, y2) = index_positions
+                            distance = np.hypot(x1 - x2, y1 - y2)
+
+                            depth_value = np.clip(
+                                np.interp(distance, [80, 350], [0.0, 1.0]),
+                                0, 1
+                            )
+
+                            target_s.current_depth += (depth_value - target_s.current_depth) * lerp_factor
+                            target_depth_ui = target_s.current_depth
+
+                            is_dragging = False
+
+
+                        # ==========================
+                        # MOVE (Grip Pose)
+                        # ==========================
+                        elif active_gesture == "move":
+
+                            if not is_dragging:
+                                drag_offset = target_s.center - np.array([ix, iy])
+                                is_dragging = True
+
+                            target_s.center = np.array([ix, iy]) + drag_offset
+
+                        # ==========================
+                        # RESIZE (Pinch)
+                        # ==========================
+                        elif active_gesture == "resize" and selected_index != -1:
+
+                            tx, ty = thumb_positions[0]
+                            d = np.hypot(tx - ix, ty - iy)
+                            target_s.scale(np.interp(d, [20, 150], [0.5, 3.0]))
+
+                            is_dragging = False
+
+                        # ==========================
+                        # ROTATE
+                        # ==========================   
+                        elif active_gesture == "rotate":
+
+                            if rotate_start_pos is None:
+                                rotate_start_pos = (ix, iy)
+                                shape_start_ax = target_s.ax
+                                shape_start_ay = target_s.ay
+
+                            dx = ix - rotate_start_pos[0]
+                            dy = iy - rotate_start_pos[1]
+
+                            sensitivity = 0.005   # smaller = slower rotation
+
+                            target_s.ay = shape_start_ay + dx * sensitivity
+                            target_s.ax = shape_start_ax + dy * sensitivity
+
+                        if active_gesture != "rotate":
+                            rotate_start_angle = None
+                            shape_start_angle = None
+        
+        # Reset rotate & drag when not active
+        if active_gesture != "rotate":
+            rotate_start_pos = None
+
+        if active_gesture != "move":
+            is_dragging = False
+
+        # drawing (only when hand present and draw gesture)
+        if landmarks_present and active_gesture == "draw":
+            current_stroke.append([ix, iy])
+        else:
+            if len(current_stroke) > 5:
+                s_new = get_perfect_shape(current_stroke)
+                if s_new:
+                    shapes_list.append(s_new)
+                # If not valid shape → DO NOTHING
+            current_stroke = []
+
+        if lock_cooldown > 0:
+            lock_cooldown -= 1
+
+        # Draw shapes
+        for i, s in enumerate(shapes_list):
+            is_active = (i == selected_index)
+            s.draw(frame, is_selected=is_active)
+
+        # Draw label ONLY if a shape is selected
+        if selected_index != -1:
+            active_shape = shapes_list[selected_index]
+            cx, cy = active_shape.center.astype(int)
+
+            frame = draw_text(
+                frame,
+                active_shape.label,
+                (cx - 70, cy - 100),
+                32,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
+
+        for s in imploding_shapes[:]:
+            s.scale_factor -= 0.25
+            if s.scale_factor <= 0:
+                imploding_shapes.remove(s)
+            else:
+                s.draw(frame, is_selected=True)
+
+        if erase_progress > 0:
+            draw_modern_eraser(frame, ix, iy, erase_progress)
+
+        if len(current_stroke) > 1:
+            cv2.polylines(frame, [np.array(current_stroke, np.int32)], False, (0, 255, 255), 2, cv2.LINE_AA)
+
+        frame = draw_ui_accent(frame, active_gesture, target_depth_ui)
+
+        frame = draw_text(
+            frame,
+            "Press B to return to menu",
+            (20, h - 40),
+            28,
+            (180,180,180),
+            "Montserrat-Medium.ttf"
+        )
+
+        frame = draw_mode_title(frame)
+
+        # ==============================
+        # FATIGUE WARNING UI
+        # ==============================
+        if fatigue_warning:
+
+            # dark overlay
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0,0), (w,h), (0,0,0), -1)
+            overlay = cv2.GaussianBlur(frame.copy(), (35,35), 0)
+            cv2.addWeighted(overlay, 0.80, frame, 0.20, 0, frame)
+
+            center_y = h // 2
+
+            # title
+            frame = draw_text(
+                frame,
+                "ARM FATIGUE WARNING",
+                (0, center_y - 60),
+                50,
+                (0,0,200),
+                "Orbitron-Bold.ttf",
+                center=True
+            )
+
+            # message
+            frame = draw_text(
+                frame,
+                "Please rest your arm for 10 seconds",
+                (0, center_y),
+                32,
+                (255,255,255),
+                "Montserrat-Medium.ttf",
+                center=True
+            )
+
+            rest_elapsed = time.time() - rest_start_time if rest_start_time else 0
+            remaining = max(0, int(REST_DURATION - rest_elapsed))
+
+            # countdown
+            frame = draw_text(
+                frame,
+                f"Rest countdown: {remaining}s",
+                (0, center_y + 60),
+                36,
+                (0,0,200),
+                "Montserrat-SemiBold.ttf",
+                center=True
+            )
+
+            if remaining == 0:
+                fatigue_warning = False
+                fatigue_active = False
+                fatigue_start_time = None
+                rest_start_time = None
+
+        cv2.imshow(window_name, frame)
+
+        key = cv2.waitKey(1) & 0xFF
+
+        if key == ord('b'):
+            cv2.destroyWindow(window_name)
+            break
+
+        # Save session
+        if key == ord('s'):
+
+            if current_session_file is not None:
+                save_session()
+
+            else:
+                name, ok = QInputDialog.getText(
+                    None,
+                    "Save Shapes Session",
+                    "Enter session name:"
+                )
+
+                if ok and name:
+                    save_session(name)
+
+    cap.release()
+    cv2.destroyAllWindows()
+    sys.exit(0)

@@ -380,7 +380,6 @@ class HandModuleWindow(QWidget):
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def start_shapes_mode(self):
-        
         self.launch_module("shapes_mode.py")
 
     def start_draw_mode(self):
@@ -392,7 +391,6 @@ class HandModuleWindow(QWidget):
     def launch_module(self, filename):
         script_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "hand_mode",
             filename
         )
         messages = {
