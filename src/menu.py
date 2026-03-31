@@ -252,15 +252,17 @@ class MainMenuGUI(QWidget):
 
         self.btn_hand = AnimatedButton("ACTIVATE HAND ENGINE", "#6366f1")
         self.btn_voice = AnimatedButton("ACTIVATE VOICE ENGINE", "#06b6d4")
+        self.btn_lessons = AnimatedButton("LESSONS / ACTIVITY", "#f59e0b")
         self.btn_guide = AnimatedButton("SYSTEM DOCUMENTATION", "#f43f5e")
         self.btn_sessions = AnimatedButton("MANAGE SAVED SESSIONS", "#22c55e")
 
         self.btn_hand.clicked.connect(self.start_hand_mode)
         self.btn_voice.clicked.connect(self.start_voice_mode)
+        self.btn_lessons.clicked.connect(self.open_lessons_menu)
         self.btn_guide.clicked.connect(self.show_guide)
         self.btn_sessions.clicked.connect(self.show_session_manager)
 
-        for b in [self.btn_hand, self.btn_voice, self.btn_guide, self.btn_sessions]:
+        for b in [self.btn_hand, self.btn_voice, self.btn_lessons, self.btn_guide, self.btn_sessions]:
             self.btn_container.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
         self.master_layout.addLayout(self.btn_container)
@@ -318,6 +320,11 @@ class MainMenuGUI(QWidget):
 
             loading.close()
             self.show_desktop()
+
+    def open_lessons_menu(self):
+        self.hide()
+        self.lesson_menu = LessonMenuWindow(self)
+        self.lesson_menu.show()
 
     def show_guide(self):
         self.hide()
@@ -707,6 +714,391 @@ class SessionManagerWindow(QWidget):
     def closeEvent(self, event):
         self.parent_menu.show_desktop()
         event.accept()
+
+class LessonMenuWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Lessons")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("LESSONS / ACTIVITY")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        # CATEGORY BUTTONS
+        self.btn_geo = AnimatedButton("GEOMETRY LESSONS", "#6366f1")
+        self.btn_math = AnimatedButton("MATHEMATICS LESSONS", "#06b6d4")
+        self.btn_sci = AnimatedButton("SCIENCE LESSONS", "#22c55e")
+        self.btn_creative = AnimatedButton("CREATIVE LESSONS", "#f59e0b")
+
+        self.btn_geo.clicked.connect(self.open_geometry)
+        self.btn_math.clicked.connect(self.open_math)
+        self.btn_sci.clicked.connect(self.open_science)
+        self.btn_creative.clicked.connect(self.open_creative)
+
+        for b in [self.btn_geo, self.btn_math, self.btn_sci, self.btn_creative]:
+            layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # BACK
+        back_btn = QPushButton("RETURN TO MAIN MENU")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.close)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def open_geometry(self):
+        self.hide()
+        self.geo_menu = GeometryLessonWindow(self)
+        self.geo_menu.showFullScreen()
+
+    def open_math(self):
+        self.hide()
+        self.math_menu = MathLessonWindow(self)
+        self.math_menu.showFullScreen()
+
+    def open_science(self):
+        self.hide()
+        self.sci_menu = ScienceLessonWindow(self)
+        self.sci_menu.showFullScreen()
+
+    def open_creative(self):
+        self.hide()
+        self.creative_menu = CreativeLessonWindow(self)
+        self.creative_menu.showFullScreen()
+
+    def closeEvent(self, event):
+        self.parent_menu.show_desktop()
+        event.accept()
+
+class GeometryLessonWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Geometry Lessons")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("GEOMETRY LESSONS")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        # LESSON BUTTONS
+        lessons = [
+            ("Shape Recognition", "lesson_shape_recognition.py"),
+            ("Shape Drawing", "lesson_shape_drawing.py"),
+            ("Shape Matching", "lesson_shape_matching.py"),
+            ("Shape Counting", "lesson_shape_counting.py"),
+            ("Shape Comparison", "lesson_shape_comparison.py"),
+        ]
+
+        for name, file in lessons:
+            btn = AnimatedButton(name.upper(), "#6366f1")
+            btn.clicked.connect(lambda _, f=file: self.run_script(f))
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # BACK
+        back_btn = QPushButton("BACK")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.go_back)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def run_script(self, filename):
+        script_path = os.path.join(self.base_path, filename)
+
+        if os.path.exists(script_path):
+            loading = LoadingScreen("Loading Lesson...")
+            loading.show()
+            QApplication.processEvents()
+
+            self.hide()
+            subprocess.run([sys.executable, script_path])
+
+            loading.close()
+
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+
+            self.show()
+            self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
+
+    def go_back(self):
+        from PyQt6.QtGui import QGuiApplication
+
+        screen = QGuiApplication.primaryScreen().geometry()
+
+        self.parent_menu.setGeometry(screen)
+        self.parent_menu.show()
+        self.parent_menu.showFullScreen()
+        self.parent_menu.activateWindow()
+        self.parent_menu.raise_()
+
+        self.hide()
+
+    def closeEvent(self, event):
+        event.accept()
+
+class MathLessonWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Mathematics Lessons")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("MATHEMATICS LESSONS")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        lessons = [
+            ("Number Recognition", "lesson_mathematics_numberrecognition.py"),
+            ("Counting Objects", "lesson_mathematics_countingobjects.py"),
+            ("Missing Number", "lesson_mathematics_missingnum.py"),
+            ("Basic Addition", "lesson_mathematics_basicadd.py"),
+            ("Number Ordering", "lesson_mathematics_numordering.py"),
+        ]
+
+        for name, file in lessons:
+            btn = AnimatedButton(name.upper(), "#06b6d4")
+            btn.clicked.connect(lambda _, f=file: self.run_script(f))
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+        back_btn = QPushButton("BACK")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.go_back)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def run_script(self, filename):
+        script_path = os.path.join(self.base_path, filename)
+
+        if os.path.exists(script_path):
+            loading = LoadingScreen("Loading Lesson...")
+            loading.show()
+            QApplication.processEvents()
+
+            self.hide()
+            subprocess.run([sys.executable, script_path])
+
+            loading.close()
+
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+
+            self.show()
+            self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
+
+    def go_back(self):
+        from PyQt6.QtGui import QGuiApplication
+
+        screen = QGuiApplication.primaryScreen().geometry()
+
+        self.parent_menu.setGeometry(screen)
+        self.parent_menu.show()
+        self.parent_menu.showFullScreen()
+        self.parent_menu.activateWindow()
+        self.parent_menu.raise_()
+
+        self.hide()
+
+    def closeEvent(self, event):
+        event.accept()
+
+class ScienceLessonWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Science Lessons")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("SCIENCE LESSONS")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        lessons = [
+            ("Planet Identification", "lesson_planet_identification.py"),
+            ("Planet Comparison", "lesson_planet_comparison.py"),
+            ("Planet Order", "lesson_planet_order.py"),
+            ("Planet Info", "lesson_planet_information.py"),
+        ]
+
+        for name, file in lessons:
+            btn = AnimatedButton(name.upper(), "#22c55e")
+            btn.clicked.connect(lambda _, f=file: self.run_script(f))
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+        back_btn = QPushButton("BACK")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.go_back)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def run_script(self, filename):
+        script_path = os.path.join(self.base_path, filename)
+
+        if os.path.exists(script_path):
+            loading = LoadingScreen("Loading Lesson...")
+            loading.show()
+            QApplication.processEvents()
+
+            self.hide()
+            subprocess.run([sys.executable, script_path])
+
+            loading.close()
+
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+
+            self.show()
+            self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
+
+    def go_back(self):
+        from PyQt6.QtGui import QGuiApplication
+
+        screen = QGuiApplication.primaryScreen().geometry()
+
+        self.parent_menu.setGeometry(screen)
+        self.parent_menu.show()
+        self.parent_menu.showFullScreen()
+        self.parent_menu.activateWindow()
+        self.parent_menu.raise_()
+
+        self.hide()
+
+    def closeEvent(self, event):
+        event.accept()
+
+class CreativeLessonWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Creative Lessons")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("CREATIVE LEARNING")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        lessons = [
+            ("Free Drawing", "lesson_creative_freedrawing.py"),
+            ("Color Learning", "lesson_creative_colourlearning.py"),
+            ("Pattern Drawing", "lesson_creative_patterndrawing.py"),
+        ]
+
+        for name, file in lessons:
+            btn = AnimatedButton(name.upper(), "#f59e0b")
+            btn.clicked.connect(lambda _, f=file: self.run_script(f))
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+        back_btn = QPushButton("BACK")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.go_back)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def run_script(self, filename):
+        script_path = os.path.join(self.base_path, filename)
+
+        if os.path.exists(script_path):
+            loading = LoadingScreen("Loading Lesson...")
+            loading.show()
+            QApplication.processEvents()
+
+            self.hide()
+            subprocess.run([sys.executable, script_path])
+
+            loading.close()
+
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+
+            self.show()
+            self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
+
+    def go_back(self):
+        from PyQt6.QtGui import QGuiApplication
+
+        screen = QGuiApplication.primaryScreen().geometry()
+
+        self.parent_menu.setGeometry(screen)
+        self.parent_menu.show()
+        self.parent_menu.showFullScreen()
+        self.parent_menu.activateWindow()
+        self.parent_menu.raise_()
+
+        self.hide()
+
+    def closeEvent(self, event):
+        event.accept()    
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

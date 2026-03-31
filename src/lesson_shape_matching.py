@@ -3,9 +3,31 @@ import numpy as np
 from gesture_engine import get_gesture
 from lesson_engine import LessonEngine
 import os
+from PIL import ImageFont
+from PIL import ImageDraw, Image
+
+def draw_text(frame, text, position, font, color=(0,0,0), center=False):
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    color_rgb = (color[2], color[1], color[0])
+
+    if center:
+        bbox = draw.textbbox((0,0), text, font=font)
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+        position = (position[0] - w//2, position[1] - h//2)
+
+    draw.text(position, text, font=font, fill=color_rgb)
+
+    return np.array(img_pil)
 
 ASSETS = os.path.join(os.path.dirname(__file__), "..", "assets")
-
+FONTS = os.path.join(os.path.dirname(__file__), "fonts")
+font_title = ImageFont.truetype(os.path.join(FONTS, "Orbitron-Bold.ttf"), 48)
+font_large = ImageFont.truetype(os.path.join(FONTS, "Montserrat-SemiBold.ttf"), 40)
+font_medium = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 30)
+font_small = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 24)
 ICON_SIZE = 90
 
 def load_icon(name):
@@ -161,14 +183,9 @@ while cap.isOpened():
     pts = np.array([[x,y-70],[x-60,y+60],[x+60,y+60]],np.int32)
     cv2.polylines(frame,[pts],True,(255,255,255),3)
 
-    cv2.putText(frame,"Circle",(280,610),
-            cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,255),1)
-
-    cv2.putText(frame,"Square",(600,610),
-                cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,255),1)
-
-    cv2.putText(frame,"Triangle",(900,610),
-                cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,255),1)
+    frame = draw_text(frame, "Circle", (320, 610), font_small, center=True)
+    frame = draw_text(frame, "Square", (640, 610), font_small, center=True)
+    frame = draw_text(frame, "Triangle", (960, 610), font_small, center=True)
     # ==============================
     # DRAW OBJECT (PNG)
     # ==============================
@@ -230,51 +247,18 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
 
-        cv2.putText(frame,
-                    q["question"],
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(frame, q["question"], (40,40), font_large)
 
         if lesson.feedback == "correct":
-
-            cv2.putText(frame,
-                        "Correct!",
-                        (40,120),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,255,0),
-                        2)
+            frame = draw_text(frame, "Correct!", (640, 110), font_large, (0,255,0), center=True)
 
         elif lesson.feedback == "wrong":
-
-            cv2.putText(frame,
-                        "Try Again",
-                        (40,120),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,0,255),
-                        2)
+            frame = draw_text(frame, "Try Again", (640, 110), font_large, (255,0,0), center=True)
 
     else:
 
-        cv2.putText(frame,
-                    "Lesson Complete!",
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0,255,255),
-                    2)
-
-        cv2.putText(frame,
-                    f"Score: {lesson.score}",
-                    (40,120),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(frame, "Lesson Complete!", (640, 60), font_title, (0,255,255), center=True)
+        frame = draw_text(frame, f"Score: {lesson.score}", (640, 130), font_medium, center=True)   
 
 
     cv2.imshow(window_name,frame)

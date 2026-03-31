@@ -11,9 +11,7 @@ class LessonEngine:
         return self.questions[self.current_question]
 
     def check_answer(self, answer):
-
         correct = self.questions[self.current_question]["answer"]
-
         if answer == correct:
             self.feedback = "correct"
             self.score += 1
