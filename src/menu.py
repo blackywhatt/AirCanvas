@@ -857,7 +857,6 @@ class GeometryLessonWindow(QWidget):
         self.parent_menu.showFullScreen()
         self.parent_menu.activateWindow()
         self.parent_menu.raise_()
-
         self.hide()
 
     def closeEvent(self, event):
