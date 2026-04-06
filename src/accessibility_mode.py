@@ -57,11 +57,11 @@ def voice_listener():
 def render_strokes(frame):
     for stroke in strokes:
         pts = np.array(stroke, np.int32)
-        cv2.polylines(frame, [pts], False, (255, 0, 0), 2, cv2.LINE_AA)
+        cv2.polylines(frame, [pts], False, (255, 0, 0), 3, cv2.LINE_AA)
 
     if len(current_stroke) > 1:
         pts = np.array(current_stroke, np.int32)
-        cv2.polylines(frame, [pts], False, (255, 0, 0), 2, cv2.LINE_AA)
+        cv2.polylines(frame, [pts], False, (255, 0, 0), 3, cv2.LINE_AA)
         
 # ==============================
 # MAIN FUNCTION
@@ -71,6 +71,9 @@ def run():
     global DRAW_COLOR, ERASE_MODE, CLEAR_FLAG, current_stroke, strokes
 
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FPS, 30)
 
     if not cap.isOpened():
         print("❌ Cannot open camera")
@@ -87,14 +90,19 @@ def run():
 
     prev_x, prev_y = 0, 0
     dwell_start = None
-    DWELL_TIME = 1.5
+    DWELL_TIME = 1.0
     drawing = False
 
-    alpha = 0.18  # smoother
+    alpha = 0.30  # smoother
 
     # Start voice thread
     if VOICE_ENABLED:
         threading.Thread(target=voice_listener, daemon=True).start()
+
+    window_name = "Accessibility Mode"
+
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     while True:
         ret, frame = cap.read()
@@ -166,7 +174,7 @@ def run():
                 cy = prev_y
 
             # LIMIT SPEED
-            max_step = 40
+            max_step = 80
             dx = cx - prev_x
             dy = cy - prev_y
             dx = max(-max_step, min(max_step, dx))
@@ -209,7 +217,17 @@ def run():
             # DRAWING
             # ======================
             if drawing:
-                current_stroke.append((cx, cy))
+                if len(current_stroke) > 0:
+                    prev_pt = current_stroke[-1]
+
+                    # interpolate points between previous and current
+                    steps = 5
+                    for i in range(1, steps + 1):
+                        ix = int(prev_pt[0] + (cx - prev_pt[0]) * i / steps)
+                        iy = int(prev_pt[1] + (cy - prev_pt[1]) * i / steps)
+                        current_stroke.append((ix, iy))
+                else:
+                    current_stroke.append((cx, cy))
             else:
                 if len(current_stroke) > 2:
                     strokes.append(current_stroke.copy())
@@ -240,10 +258,22 @@ def run():
         cv2.putText(combined, color_text, (650, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        cv2.imshow("Accessibility Mode", combined)
+        cv2.imshow(window_name, combined)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        key = cv2.waitKey(1) & 0xFF
+
+        if key == ord('q'):
             break
+
+        if key == ord('f'):
+            cv2.setWindowProperty(window_name,
+                cv2.WND_PROP_FULLSCREEN,
+                cv2.WINDOW_FULLSCREEN)
+
+        if key == ord('w'):
+            cv2.setWindowProperty(window_name,
+                cv2.WND_PROP_FULLSCREEN,
+                cv2.WINDOW_NORMAL)
 
     cap.release()
     cv2.destroyAllWindows()
