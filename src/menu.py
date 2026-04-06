@@ -252,17 +252,19 @@ class MainMenuGUI(QWidget):
 
         self.btn_hand = AnimatedButton("ACTIVATE HAND ENGINE", "#6366f1")
         self.btn_voice = AnimatedButton("ACTIVATE VOICE ENGINE", "#06b6d4")
-        self.btn_lessons = AnimatedButton("LESSONS / ACTIVITY", "#f59e0b")
+        self.btn_accessibility = AnimatedButton("ACCESSIBILITY MODE", "#a855f7")
+        self.btn_lessons = AnimatedButton("LESSONS / ACTIVITY", "#fbbf24")
         self.btn_guide = AnimatedButton("SYSTEM DOCUMENTATION", "#f43f5e")
         self.btn_sessions = AnimatedButton("MANAGE SAVED SESSIONS", "#22c55e")
 
         self.btn_hand.clicked.connect(self.start_hand_mode)
         self.btn_voice.clicked.connect(self.start_voice_mode)
+        self.btn_accessibility.clicked.connect(self.start_accessibility_mode)
         self.btn_lessons.clicked.connect(self.open_lessons_menu)
         self.btn_guide.clicked.connect(self.show_guide)
         self.btn_sessions.clicked.connect(self.show_session_manager)
 
-        for b in [self.btn_hand, self.btn_voice, self.btn_lessons, self.btn_guide, self.btn_sessions]:
+        for b in [self.btn_hand, self.btn_voice, self.btn_accessibility, self.btn_lessons, self.btn_guide, self.btn_sessions]:
             self.btn_container.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
         self.master_layout.addLayout(self.btn_container)
@@ -307,10 +309,15 @@ class MainMenuGUI(QWidget):
         self.hand_module_window.show()
 
     def start_voice_mode(self):
-        script_path = os.path.join(self.base_path, "voice_mode", "voice_mode.py")
+        self.hide()
+        self.voice_module_window = VoiceModuleWindow(self)
+        self.voice_module_window.show()
+
+    def start_accessibility_mode(self):
+        script_path = os.path.join(self.base_path, "accessibility_mode.py")
 
         if os.path.exists(script_path):
-            loading = self.show_loading("Loading Voice Engine...")
+            loading = self.show_loading("Loading Accessibility Mode...")
             loading.showFullScreen()
 
             self.hide()
@@ -416,6 +423,104 @@ class HandModuleWindow(QWidget):
             from PyQt6.QtGui import QGuiApplication
             screen = QGuiApplication.primaryScreen().geometry()
             self.setGeometry(screen)
+            self.show()
+            self.showFullScreen()
+            self.activateWindow()
+            self.raise_()
+
+    def closeEvent(self, event):
+        self.parent_menu.show_desktop()
+        event.accept()
+
+class VoiceModuleWindow(QWidget):
+    def __init__(self, parent_menu):
+        super().__init__()
+        self.parent_menu = parent_menu
+        self.setWindowTitle("Voice Engine Modules")
+        self.showFullScreen()
+        self.setStyleSheet("background-color: #030305;")
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+
+        title = QLabel("VOICE ENGINE MODULES")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            color: white;
+            font-size: 40pt;
+            font-weight: 900;
+            letter-spacing: 10px;
+        """)
+        layout.addWidget(title)
+
+        # Buttons
+        self.btn_draw = AnimatedButton("VOICE DRAW MODULE", "#06b6d4")
+        self.btn_shapes = AnimatedButton("VOICE SHAPES MODULE", "#6366f1")
+        self.btn_solar = AnimatedButton("VOICE SOLAR MODULE", "#22c55e")
+
+        self.btn_draw.clicked.connect(self.start_voice_draw)
+        self.btn_shapes.clicked.connect(self.start_voice_shapes)
+        self.btn_solar.clicked.connect(self.start_voice_solar)
+
+        for b in [self.btn_draw, self.btn_shapes, self.btn_solar]:
+            layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # Back button
+        back_btn = QPushButton("RETURN TO MAIN MENU")
+        back_btn.setFixedSize(300, 60)
+        back_btn.clicked.connect(self.close)
+        back_btn.setStyleSheet("""
+            QPushButton {
+                background: white;
+                color: black;
+                font-weight: bold;
+                border-radius: 15px;
+            }
+            QPushButton:hover {
+                background: #06b6d4;
+                color: white;
+            }
+        """)
+        layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def start_voice_draw(self):
+        self.launch_module("voice_draw.py")
+
+    def start_voice_shapes(self):
+        self.launch_module("voice_shapes.py")
+
+    def start_voice_solar(self):
+        self.launch_module("voice_solar.py")
+
+    def launch_module(self, filename):
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            filename
+        )
+
+        messages = {
+            "voice_draw.py": "Loading Voice Draw...",
+            "voice_shapes.py": "Loading Voice Shapes...",
+            "voice_solar.py": "Loading Voice Solar..."
+        }
+
+        message = messages.get(filename, "Loading Voice Module...")
+
+        if os.path.exists(script_path):
+            loading = LoadingScreen(message)
+            loading.show()
+            QApplication.processEvents()
+
+            self.hide()
+            subprocess.run([sys.executable, script_path])
+
+            loading.close()
+
+            from PyQt6.QtGui import QGuiApplication
+            screen = QGuiApplication.primaryScreen().geometry()
+            self.setGeometry(screen)
+
             self.show()
             self.showFullScreen()
             self.activateWindow()
