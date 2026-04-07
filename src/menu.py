@@ -46,7 +46,7 @@ class AnimatedButton(QPushButton):
         
         # Glow Effect Logic
         self.shadow = QGraphicsDropShadowEffect()
-        self.shadow.setBlurRadius(25)
+        self.shadow.setBlurRadius(70)
         self.shadow.setColor(QColor(0, 0, 0, 0)) 
         self.shadow.setOffset(0, 0)
         self.setGraphicsEffect(self.shadow)
@@ -64,7 +64,7 @@ class AnimatedButton(QPushButton):
         self.anim = QPropertyAnimation(self, b"pos")
         self.anim.setDuration(200)
         self.anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-        self.anim.setEndValue(QPoint(self.original_pos.x(), self.original_pos.y() - 8))
+        self.anim.setEndValue(QPoint(self.original_pos.x(), self.original_pos.y() - 5))
         self.anim.start()
         super().enterEvent(event)
 
@@ -120,39 +120,102 @@ class GuideWindow(QWidget):
 
         self.text_area = QTextEdit()
         self.text_area.setReadOnly(True)
-        # Increased font sizes and line heights for a bigger feel
         self.text_area.setHtml("""
-            <div style='color: rgba(255,255,255,0.8); font-size: 14pt; line-height: 180%;'>
-                
-                <table width='100%' cellpadding='20'>
-                    <tr>
-                        <td width='50%' valign='top' style='border-right: 1px solid rgba(255,255,255,0.1);'>
-                            <p align='center'><b style='color:#6366f1; font-size: 18pt;'>✋ HAND ENGINE GESTURES</b></p>
-                            <ul style='list-style-type: square; margin-top: 20px;'>
-                                <li><b>✍️ DRAW:</b> Use index finger to sketch 3D primitives.</li>
-                                <li><b>🔄 ROTATE:</b> Move hand to orbit the active object.</li>
-                                <li><b>↔️ RESIZE:</b> Pinch thumb & index to scale dimensions.</li>
-                                <li><b>📏 DEPTH:</b> Expand hand span to adjust Z-axis thickness.</li>
-                                <li><b>✊ LOCK/UNLOCK:</b> Use fist gesture to freeze object state.</li>
-                            </ul>
-                        </td>
-                        <td width='50%' valign='top'>
-                            <p align='center'><b style='color:#06b6d4; font-size: 18pt;'>🎙️ VOICE ENGINE COMMANDS</b></p>
-                            <div style='background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; margin-top: 20px;'>
-                                <p><b>SHAPES:</b> "Circle", "Square", "Triangle"</p>
-                                <p><b>TRANSFORM:</b> "Bigger", "Smaller", "Rotate"</p>
-                                <p><b>POSITION:</b> "Up", "Down", "Left", "Right"</p>
-                                <p><b>DIMENSION:</b> "Three D", "Two D"</p>
-                                <p><b>SYSTEM:</b> "Clear", "Reset", "Red", "Blue"</p>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
+        <div style='color: rgba(255,255,255,0.85); font-size: 14pt; line-height: 180%;'>
 
-                <p align='center' style='margin-top: 40px; color: rgba(255,255,255,0.4); font-size: 12pt;'>
-                    <i>Selection Logic: The system auto-targets the object closest to your index finger landmark.</i>
+            <table width='100%' cellpadding='20'>
+                <tr>
+                    <!-- HAND ENGINE -->
+                    <td width='50%' valign='top' style='border-right: 1px solid rgba(255,255,255,0.1);'>
+                        
+                        <p align='center'>
+                            <b style='color:#6366f1; font-size: 20pt;'>✋ HAND ENGINE</b>
+                        </p>
+
+                        <p style='text-align: justify; margin-top: 20px;'>
+                            The Hand Engine enables real-time spatial interaction using advanced gesture recognition. 
+                            Users can directly manipulate digital objects in a natural and intuitive way, 
+                            eliminating the need for traditional input devices.
+                        </p>
+
+                        <ul style='margin-top: 20px;'>
+                            <li><b>✍️ DRAW MODE:</b> Create free-form strokes and geometric structures in real-time.</li>
+                            <li><b>🔄 ROTATION CONTROL:</b> Rotate objects dynamically through hand movement tracking.</li>
+                            <li><b>📏 SCALING:</b> Resize objects using pinch gestures with precision control.</li>
+                            <li><b>🧭 DEPTH ADJUSTMENT:</b> Modify object thickness and 3D depth interactively.</li>
+                            <li><b>✊ STATE CONTROL:</b> Lock or release objects using gesture-based commands.</li>
+                        </ul>
+
+                        <p style='margin-top: 25px; color: rgba(255,255,255,0.5);'>
+                            System intelligently detects the closest object relative to the user's index finger 
+                            for accurate selection and manipulation.
+                        </p>
+
+                    </td>
+
+                    <!-- VOICE ENGINE -->
+                    <td width='50%' valign='top'>
+                        
+                        <p align='center'>
+                            <b style='color:#06b6d4; font-size: 20pt;'>🎙️ VOICE ENGINE</b>
+                        </p>
+
+                        <p style='text-align: justify; margin-top: 20px;'>
+                            The Voice Engine provides hands-free control through real-time speech recognition. 
+                            It allows users to execute commands, manipulate objects, and control system behavior 
+                            using natural language interaction.
+                        </p>
+
+                        <div style='background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; margin-top: 20px;'>
+
+                            <p><b>🟦 SHAPE GENERATION</b><br>
+                            "Circle", "Square", "Triangle"</p>
+
+                            <p><b>🎨 VISUAL CONTROL</b><br>
+                            "Red", "Blue", "Green"</p>
+
+                            <p><b>📐 TRANSFORMATION</b><br>
+                            "Bigger", "Smaller", "Rotate"</p>
+
+                            <p><b>🧭 POSITIONING</b><br>
+                            "Up", "Down", "Left", "Right"</p>
+
+                            <p><b>🌐 MODE CONTROL</b><br>
+                            "Three D", "Two D"</p>
+
+                            <p><b>⚙️ SYSTEM COMMANDS</b><br>
+                            "Clear", "Reset", "Delete"</p>
+
+                        </div>
+
+                        <p style='margin-top: 25px; color: rgba(255,255,255,0.5);'>
+                            The system processes voice input locally, ensuring fast response time and offline capability.
+                        </p>
+
+                    </td>
+                </tr>
+            </table>
+
+            <hr style='margin-top: 40px; border: 1px solid rgba(255,255,255,0.1);'>
+
+            <!-- SYSTEM CAPABILITIES -->
+            <div style='margin-top: 30px; text-align: center;'>
+
+                <p style='font-size: 18pt; font-weight: bold; letter-spacing: 3px; color: #fbbf24;'>
+                    ⚡ SYSTEM CAPABILITIES
                 </p>
+
+                <p style='margin-top: 20px;'>
+                    • Real-time gesture tracking with spatial awareness<br>
+                    • Voice-controlled interaction without external devices<br>
+                    • Interactive 2D and 3D visualization environment<br>
+                    • Multi-module learning system (Geometry, Math, Science, Creative)<br>
+                    • Session saving and restoration for continuous learning
+                </p>
+
             </div>
+
+        </div>
         """)
         self.text_area.setStyleSheet("background: transparent; border: none;")
         # Increased height significantly
@@ -225,7 +288,7 @@ class MainMenuGUI(QWidget):
         super().__init__()
         self.setWindowTitle("AirCanvas Interface")
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.setStyleSheet("background-color: #030305; font-family: 'Segoe UI', sans-serif;")
+        self.setStyleSheet("background-color: #020204; font-family: 'Segoe UI', sans-serif;")
 
         self.master_layout = QVBoxLayout(self)
         self.master_layout.addStretch(1)
@@ -240,7 +303,7 @@ class MainMenuGUI(QWidget):
         
         subtitle = QLabel("SMART CLASSROOM ASSISTANT")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("font-size: 8pt; color: rgba(255,255,255,0.3); font-weight: bold; letter-spacing: 8px; margin-top: 20px; margin-bottom: 50px;")
+        subtitle.setStyleSheet("font-size: 10pt; color: rgba(255,255,255,0.3); font-weight: bold; letter-spacing: 8px; margin-top: 20px; margin-bottom: 50px;")
         
         self.master_layout.addWidget(title_label, 0, Qt.AlignmentFlag.AlignCenter)
         self.master_layout.addWidget(glow_line, 0, Qt.AlignmentFlag.AlignCenter)
@@ -317,11 +380,11 @@ class MainMenuGUI(QWidget):
         script_path = os.path.join(self.base_path, "accessibility_mode.py")
 
         if os.path.exists(script_path):
-            loading = self.show_loading("Loading Accessibility Mode...")
-            loading.showFullScreen()
+            loading = LoadingScreen("Loading Accessibility Mode...")
+            loading.show()
+            QApplication.processEvents()
 
             self.hide()
-            QApplication.processEvents()
 
             subprocess.run([sys.executable, script_path])
 
@@ -992,7 +1055,7 @@ class MathLessonWindow(QWidget):
         layout.addWidget(title)
 
         lessons = [
-            ("Number Recognition", "lesson_mathematics_numberrecognition.py"),
+            ("Number Recognition", "lesson_mathematics_numrecognition.py"),
             ("Counting Objects", "lesson_mathematics_countingobjects.py"),
             ("Missing Number", "lesson_mathematics_missingnum.py"),
             ("Basic Addition", "lesson_mathematics_basicadd.py"),
