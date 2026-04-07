@@ -5,12 +5,11 @@ import json
 import os
 import sys
 from datetime import datetime
-from PyQt6.QtWidgets import QApplication, QInputDialog
 from gesture_engine import get_gesture
 
-qt_app = QApplication.instance()
-if not qt_app:
-    qt_app = QApplication(sys.argv)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+sys.path.append(os.path.dirname(BASE_DIR))
 
 prev_ix = None
 prev_iy = None
@@ -665,13 +664,8 @@ while cap.isOpened():
             save_session()
 
         else:
-            name, ok = QInputDialog.getText(
-                None,
-                "Save Solar Session",
-                "Enter session name:"
-            )
-
-            if ok and name:
+            name = input("Enter session name: ")
+            if name:
                 save_session(name)
 
 cap.release()
