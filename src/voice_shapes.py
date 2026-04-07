@@ -10,7 +10,7 @@ import math
 
 # --- Setup Vosk ---
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_PATH, "..", "model")
+MODEL_PATH = os.path.join(BASE_PATH, "model")
 vosk_model = Model(MODEL_PATH)
 
 list_of_commands = '["circle", "square", "triangle", "select circle", "select square", "select triangle", "red", "green", "blue", "clear", "reset", "delete shape", "bigger", "smaller", "left", "right", "up", "down", "three d", "two d", "rotate", "next shape", "previous shape", "[unk]"]'

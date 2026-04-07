@@ -16,7 +16,7 @@ from datetime import datetime
 # VOICE SETUP
 # ==============================
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_PATH, "..", "model")
+MODEL_PATH = os.path.join(BASE_PATH, "model")
 
 vosk_model = Model(MODEL_PATH)
 
