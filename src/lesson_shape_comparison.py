@@ -7,7 +7,6 @@ from lesson_engine import LessonEngine
 # ==============================
 # QUESTIONS
 # ==============================
-
 questions = [
     {"question":"Which has MORE SIDES?", "type":"sides"},
     {"question":"Which has LESS SIDES?", "type":"less"}
@@ -15,11 +14,9 @@ questions = [
 
 lesson = LessonEngine(questions)
 
-
 # ==============================
 # SHAPE DATA
 # ==============================
-
 shape_sides = {
     "triangle":3,
     "square":4,
@@ -31,11 +28,9 @@ shape_positions = {
     "right":(880,360)
 }
 
-
 # ==============================
 # GENERATE QUESTION
 # ==============================
-
 def generate_pair():
 
     shapes = ["triangle","square","circle"]
@@ -51,11 +46,9 @@ def generate_pair():
 
 left_shape, right_shape = generate_pair()
 
-
 # ==============================
 # DRAW SHAPE
 # ==============================
-
 def draw_shape(frame,shape,pos):
 
     x,y = pos
@@ -70,11 +63,9 @@ def draw_shape(frame,shape,pos):
         pts = np.array([[x,y-80],[x-70,y+70],[x+70,y+70]],np.int32)
         cv2.polylines(frame,[pts],True,(255,255,255),3)
 
-
 # ==============================
 # DETECT SELECTION
 # ==============================
-
 def detect_choice(ix,iy):
 
     for side,(x,y) in shape_positions.items():
@@ -84,11 +75,9 @@ def detect_choice(ix,iy):
 
     return None
 
-
 # ==============================
 # CAMERA
 # ==============================
-
 cap = cv2.VideoCapture(0,cv2.CAP_DSHOW)
 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH,1280)
@@ -101,11 +90,9 @@ cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 answer_cooldown = 0
 
-
 # ==============================
 # MAIN LOOP
 # ==============================
-
 while cap.isOpened():
 
     ret,frame = cap.read()
@@ -117,19 +104,15 @@ while cap.isOpened():
 
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
 
-
     # ==============================
     # DRAW SHAPES
     # ==============================
-
     draw_shape(frame,left_shape,shape_positions["left"])
     draw_shape(frame,right_shape,shape_positions["right"])
-
 
     # ==============================
     # GET CURSOR
     # ==============================
-
     if hand_count > 0 and len(index_positions) > 0:
 
         ix,iy = index_positions[0]
@@ -148,7 +131,6 @@ while cap.isOpened():
             # ==============================
             # DETERMINE CORRECT
             # ==============================
-
             if q["type"] == "sides":
                 correct = "left" if left_sides > right_sides else "right"
 
@@ -165,11 +147,9 @@ while cap.isOpened():
 
             answer_cooldown = 30
 
-
     # ==============================
     # TEXT
     # ==============================
-
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
