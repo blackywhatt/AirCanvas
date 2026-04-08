@@ -4,12 +4,8 @@ import subprocess
 import warnings
 import json
 import time
-# Suppress deprecation warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, 
-                             QVBoxLayout, QTextEdit, QHBoxLayout, 
-                             QFrame, QGraphicsDropShadowEffect, QListWidget,
+from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QTextEdit, QHBoxLayout, QFrame, QGraphicsDropShadowEffect, QListWidget, 
                              QMessageBox, QInputDialog, QProgressDialog)
 from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QEasingCurve
 from PyQt6.QtGui import QFont, QColor
@@ -88,13 +84,10 @@ class GuideWindow(QWidget):
         self.showFullScreen()
         self.setStyleSheet("background-color: #030305;")
 
-        # Main layout for the entire screen
         master_v = QVBoxLayout(self)
         master_v.setContentsMargins(50, 50, 50, 50)
         
-        # Expanded Frame to act as a large "Terminal" or "Dashboard"
         hud_frame = QFrame()
-        # Removed setFixedWidth to allow it to expand
         hud_frame.setStyleSheet("""
             QFrame {
                 background-color: rgba(255, 255, 255, 0.03);
@@ -218,11 +211,9 @@ class GuideWindow(QWidget):
         </div>
         """)
         self.text_area.setStyleSheet("background: transparent; border: none;")
-        # Increased height significantly
         self.text_area.setMinimumHeight(500)
         layout.addWidget(self.text_area)
 
-        # Large Back Button
         dismiss_btn = QPushButton("RETURN TO COMMAND CENTER")
         dismiss_btn.setFixedHeight(80)
         dismiss_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -236,7 +227,6 @@ class GuideWindow(QWidget):
         """)
         layout.addWidget(dismiss_btn)
 
-        # Add the frame to the master layout
         master_v.addWidget(hud_frame)
 
     def closeEvent(self, event):
@@ -256,28 +246,15 @@ class LoadingScreen(QWidget):
 
         title = QLabel("AIR CANVAS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            font-size: 70pt;
-            font-weight: 900;
-            color: white;
-            letter-spacing: -2px;
-        """)
+        title.setStyleSheet("""font-size: 70pt; font-weight: 900; color: white; letter-spacing: -2px; """)
 
         msg = QLabel(message)
         msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setStyleSheet("""
-            font-size: 18pt;
-            color: rgba(255,255,255,0.6);
-            margin-top: 20px;
-        """)
+        msg.setStyleSheet("""font-size: 18pt; color: rgba(255,255,255,0.6); margin-top: 20px; """)
 
         loading = QLabel("Initializing system...")
         loading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        loading.setStyleSheet("""
-            font-size: 12pt;
-            color: rgba(255,255,255,0.3);
-            margin-top: 10px;
-        """)
+        loading.setStyleSheet("""font-size: 12pt; color: rgba(255,255,255,0.3); margin-top: 10px; """)
 
         layout.addWidget(title)
         layout.addWidget(msg)
@@ -383,11 +360,8 @@ class MainMenuGUI(QWidget):
             loading = LoadingScreen("Loading Accessibility Mode...")
             loading.show()
             QApplication.processEvents()
-
             self.hide()
-
             subprocess.run([sys.executable, script_path])
-
             loading.close()
             self.show_desktop()
 
@@ -420,12 +394,7 @@ class HandModuleWindow(QWidget):
 
         title = QLabel("HAND ENGINE MODULES")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            color: white;
-            font-size: 40pt;
-            font-weight: 900;
-            letter-spacing: 10px;
-        """)
+        title.setStyleSheet(""" color: white; font-size: 40pt; font-weight: 900; letter-spacing: 10px; """)
         layout.addWidget(title)
 
         self.btn_shapes = AnimatedButton("SHAPES MODULE", "#6366f1")
