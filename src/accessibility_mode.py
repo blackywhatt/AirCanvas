@@ -20,7 +20,6 @@ DRAW_COLOR = (255, 0, 0)
 ERASE_MODE = False
 CLEAR_FLAG = False
 
-
 # ==============================
 # VOICE LISTENER
 # ==============================
