@@ -18,7 +18,6 @@ class AnimatedButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.original_pos = None  
 
-        # Modern Tech Style: Semi-transparent 'Glass' look
         self.default_style = f"""
             QPushButton {{
                 background-color: rgba(255, 255, 255, 0.04);
@@ -40,7 +39,6 @@ class AnimatedButton(QPushButton):
         """
         self.setStyleSheet(self.default_style)
         
-        # Glow Effect Logic
         self.shadow = QGraphicsDropShadowEffect()
         self.shadow.setBlurRadius(70)
         self.shadow.setColor(QColor(0, 0, 0, 0)) 
@@ -633,7 +631,6 @@ class SessionManagerWindow(QWidget):
 
         card_layout.addWidget(self.session_list)
 
-        # Buttons row 1
         row1 = QHBoxLayout()
 
         self.btn_load = QPushButton("LOAD")
@@ -650,25 +647,21 @@ class SessionManagerWindow(QWidget):
 
         card_layout.addLayout(row1)
 
-        # Buttons row 2
         row2 = QHBoxLayout()
 
         self.btn_refresh = QPushButton("REFRESH")
         self.btn_back = QPushButton("BACK")
 
-        # Button cursor
         for btn in [self.btn_refresh, self.btn_back]:
             btn.setFixedHeight(45)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # Connect buttons
         self.btn_load.clicked.connect(self.load_session)
         self.btn_rename.clicked.connect(self.rename_session)
         self.btn_delete.clicked.connect(self.delete_session)
         self.btn_refresh.clicked.connect(self.refresh_sessions)
         self.btn_back.clicked.connect(self.close)
 
-        # Button styling
         self.btn_load.setStyleSheet("""
         QPushButton {
             background: #22c55e;
@@ -799,7 +792,6 @@ class SessionManagerWindow(QWidget):
             new_path = os.path.join(self.session_folder, new_filename)
 
             os.rename(old_path, new_path)
-
             self.refresh_sessions()
 
     def load_session(self):
@@ -819,7 +811,6 @@ class SessionManagerWindow(QWidget):
             data = json.load(f)
 
         mode = data.get("mode")
-
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
         if mode == "free_draw":
@@ -835,7 +826,6 @@ class SessionManagerWindow(QWidget):
             print("Unknown session mode")
             return
         
-        # Show loading screen
         loading = LoadingScreen("Loading Saved Session...")
         loading.show()
         QApplication.processEvents()
@@ -874,7 +864,6 @@ class LessonMenuWindow(QWidget):
         """)
         layout.addWidget(title)
 
-        # CATEGORY BUTTONS
         self.btn_geo = AnimatedButton("GEOMETRY LESSONS", "#6366f1")
         self.btn_math = AnimatedButton("MATHEMATICS LESSONS", "#06b6d4")
         self.btn_sci = AnimatedButton("SCIENCE LESSONS", "#22c55e")
@@ -888,7 +877,6 @@ class LessonMenuWindow(QWidget):
         for b in [self.btn_geo, self.btn_math, self.btn_sci, self.btn_creative]:
             layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # BACK
         back_btn = QPushButton("RETURN TO MAIN MENU")
         back_btn.setFixedSize(300, 60)
         back_btn.clicked.connect(self.close)
@@ -942,7 +930,6 @@ class GeometryLessonWindow(QWidget):
         """)
         layout.addWidget(title)
 
-        # LESSON BUTTONS
         lessons = [
             ("Shape Recognition", "lesson_shape_recognition.py"),
             ("Shape Drawing", "lesson_shape_drawing.py"),
@@ -956,7 +943,6 @@ class GeometryLessonWindow(QWidget):
             btn.clicked.connect(lambda _, f=file: self.run_script(f))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        # BACK
         back_btn = QPushButton("BACK")
         back_btn.setFixedSize(300, 60)
         back_btn.clicked.connect(self.go_back)

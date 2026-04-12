@@ -160,9 +160,7 @@ def run():
 
             # Draw ONLY center (clean look)
             cv2.circle(frame, (raw_x, raw_y), 6, (0, 255, 255), -1)
-            # ======================
-            # SMOOTHING
-            # ======================
+
             cx = int(alpha * raw_x + (1 - alpha) * prev_x)
             cy = int(alpha * raw_y + (1 - alpha) * prev_y)
 

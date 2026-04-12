@@ -2,6 +2,9 @@ import cv2
 import numpy as np
 from gesture_engine import get_gesture
 from lesson_engine import LessonEngine
+import os
+from PIL import ImageFont, ImageDraw, Image
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 
 hover_shape = None
 hover_frames = 0
@@ -40,6 +43,30 @@ cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 answer_cooldown = 0
 
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
 # ==============================
 # Helper: detect shape selection
 # ==============================
@@ -53,7 +80,6 @@ def detect_selected_shape(ix,iy):
             return shape
 
     return None
-
 
 # ==============================
 # Main Loop
@@ -74,11 +100,23 @@ while cap.isOpened():
     # ==============================
     # DEBUG INFO
     # ==============================
-    cv2.putText(frame,f"Hands: {hand_count}",(40,160),
-                cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,0),1)
+    frame = draw_text(
+        frame,
+        f"Hands: {hand_count}",
+        (40, 140),
+        24,
+        (255,255,0),
+        "Montserrat-Medium.ttf"
+    )
 
-    cv2.putText(frame,f"Gesture: {gesture}",(40,190),
-                cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,0),1)
+    frame = draw_text(
+        frame,
+        f"Gesture: {gesture}",
+        (40, 170),
+        24,
+        (255,255,0),
+        "Montserrat-Medium.ttf"
+    )
 
     # ==============================
     # DRAW SHAPES
@@ -106,12 +144,14 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
 
-        cv2.putText(frame,q["question"],
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            q["question"],
+            (40, 30),
+            36,
+            (255,255,255),
+            "Orbitron-Bold.ttf"
+        )
 
         if hand_count > 0 and len(index_positions) > 0:
 
@@ -139,40 +179,48 @@ while cap.isOpened():
         # Feedback
         if lesson.feedback == "correct":
 
-            cv2.putText(frame,"Correct!",
-                        (40,120),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,255,0),
-                        2)
+            frame = draw_text(
+                frame,
+                "Correct!",
+                (40, 80),
+                30,
+                (0,255,0),
+                "Montserrat-SemiBold.ttf"
+            )
 
         elif lesson.feedback == "wrong":
 
-            cv2.putText(frame,"Try Again",
-                        (40,120),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,0,255),
-                        2)
+            frame = draw_text(
+                frame,
+                "Try Again",
+                (40, 80),
+                30,
+                (0,0,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
     # ==============================
     # LESSON FINISHED
     # ==============================
     else:
 
-        cv2.putText(frame,"Lesson Complete!",
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            "Lesson Complete!",
+            (40, 30),
+            36,
+            (0,255,255),
+            "Orbitron-Bold.ttf"
+        )
 
-        cv2.putText(frame,f"Score: {lesson.score}",
-                    (40,120),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            f"Score: {lesson.score}",
+            (40, 80),
+            30,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
     # ==============================
     # Cooldown
