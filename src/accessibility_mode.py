@@ -3,6 +3,10 @@ import mediapipe as mp
 import numpy as np
 import time
 import threading
+from PIL import ImageFont, ImageDraw, Image
+import os
+
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
 
 current_stroke = []
 strokes = []
@@ -19,6 +23,30 @@ except:
 DRAW_COLOR = (255, 0, 0)
 ERASE_MODE = False
 CLEAR_FLAG = False
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w)//2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 # ==============================
 # VOICE LISTENER
@@ -243,17 +271,41 @@ def run():
         mode_text = "ERASE" if ERASE_MODE else "DRAW"
         color_text = f"Color: {DRAW_COLOR}"
 
-        cv2.putText(combined, "Accessibility Mode", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        combined = draw_text(
+            combined,
+            "Accessibility Mode",
+            (20, 15),
+            24,
+            (255,255,255),
+            "Orbitron-Bold.ttf"
+        )
 
-        cv2.putText(combined, status_text, (300, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        combined = draw_text(
+            combined,
+            status_text,
+            (280, 15),
+            22,
+            (0,255,255),
+            "Montserrat-Medium.ttf"
+        )
 
-        cv2.putText(combined, mode_text, (500, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        combined = draw_text(
+            combined,
+            mode_text,
+            (520, 15),
+            22,
+            (0,255,0),
+            "Montserrat-SemiBold.ttf"
+        )
 
-        cv2.putText(combined, color_text, (650, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        combined = draw_text(
+            combined,
+            color_text,
+            (700, 15),
+            20,
+            (255,255,255),
+            "Montserrat-Medium.ttf"
+        )
 
         cv2.imshow(window_name, combined)
 

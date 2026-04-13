@@ -11,7 +11,10 @@ import queue
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 from datetime import datetime
+import os
+from PIL import ImageFont, ImageDraw, Image
 
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 # ==============================
 # VOICE SETUP
 # ==============================
@@ -24,6 +27,30 @@ voice_commands = '["red","green","blue","bigger","smaller","clear canvas","undo"
 rec = KaldiRecognizer(vosk_model, 16000, voice_commands)
 
 audio_queue = queue.Queue()
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 def audio_callback(indata, frames, time, status):
     audio_queue.put(bytes(indata))
@@ -189,41 +216,42 @@ with sd.RawInputStream(
         # ==============================
         # UI
         # ==============================
-        cv2.putText(frame,
-                    "VOICE DRAW MODE",
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.9,
-                    (255,255,255),
-                    1,
-                    cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            "VOICE DRAW MODE",
+            (0, 30),
+            36,
+            (255,255,255),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
 
-        cv2.putText(frame,
-                    f"COLOR: {current_color}",
-                    (40,95),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    (200,200,200),
-                    1,
-                    cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            f"COLOR: {current_color}",
+            (40, 80),
+            26,
+            (200,200,200),
+            "Montserrat-Medium.ttf"
+        )
 
-        cv2.putText(frame,
-                    f"THICKNESS: {thickness}",
-                    (40,120),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    (200,200,200),
-                    1,
-                    cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            f"THICKNESS: {thickness}",
+            (40, 110),
+            26,
+            (200,200,200),
+            "Montserrat-Medium.ttf"
+        )
 
-        cv2.putText(frame,
-                    "Voice: red | green | blue | bigger | smaller | undo | clear canvas",
-                    (40,690),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (180,180,180),
-                    1,
-                    cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            "Voice: red | green | blue | bigger | smaller | undo | clear canvas",
+            (40, 670),
+            22,
+            (180,180,180),
+            "Montserrat-Medium.ttf"
+        )
 
         cv2.imshow(window_name,frame)
 
@@ -231,6 +259,7 @@ with sd.RawInputStream(
 
         if key == ord("b"):
             break
+    
 
 cap.release()
 cv2.destroyAllWindows()

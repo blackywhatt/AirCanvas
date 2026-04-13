@@ -6,8 +6,10 @@ import os
 import sys
 from datetime import datetime
 from gesture_engine import get_gesture
+from PIL import ImageFont, ImageDraw, Image
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.dirname(BASE_DIR))
 
@@ -69,6 +71,30 @@ simulation_speed = 1.0
 # Orbit trails
 orbit_trails = {i: [] for i in range(len(planets))}
 MAX_TRAIL_LENGTH = 60
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w)//2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 # ==============================
 # 3D Projection
@@ -134,16 +160,18 @@ def draw_info_panel(frame, planet, px, py):
     # draw text
     y_offset = panel_y + 25
     for i, line in enumerate(lines):
-        font_scale = 0.6 if i == 0 else 0.5
-        thickness = 2 if i == 0 else 1
 
-        cv2.putText(frame, line,
-                    (panel_x + 10, y_offset),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    font_scale,
-                    (255, 255, 255),
-                    thickness,
-                    cv2.LINE_AA)
+        size = 22 if i == 0 else 18
+        font_name = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
+
+        frame = draw_text(
+            frame,
+            line,
+            (panel_x + 10, y_offset - 15),
+            size,
+            (255,255,255),
+            font_name
+        )
 
         y_offset += 22
 
@@ -370,14 +398,14 @@ while cap.isOpened():
 
             progress = min(hold_time / RESET_HOLD_TIME, 1)
 
-            cv2.putText(frame,
-                        f"Hold to reset: {int(progress*100)}%",
-                        (40, 130),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        (0, 150, 255),
-                        2,
-                        cv2.LINE_AA)
+            frame = draw_text(
+                frame,
+                f"Hold to reset: {int(progress*100)}%",
+                (40, 120),
+                24,
+                (0,150,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
             if hold_time >= RESET_HOLD_TIME:
                 ax, ay = 0.0, 0.0
@@ -601,51 +629,56 @@ while cap.isOpened():
 
         # label selected planet
         if i == selected_index:
-            cv2.putText(frame, p["name"],
-                        (px - 40, py - radius - 10),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.8,
-                        (255, 255, 255),
-                        2,
-                        cv2.LINE_AA)
+            frame = draw_text(
+                frame,
+                p["name"],
+                (px - 40, py - radius - 30),
+                26,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
         if i == selected_index:
             draw_info_panel(frame, p, px, py)
     # ==============================
     # HUD
     # ==============================
-    cv2.putText(frame, "SOLAR SYSTEM MODE",
-                (40, 50),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        "SOLAR SYSTEM MODE",
+        (0, 20),
+        36,
+        (255,255,255),
+        "Orbitron-Bold.ttf",
+        center=True
+    )
 
-    cv2.putText(frame, f"SELECTED: {planets[selected_index]['name']}",
-                (40, 90),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (200, 200, 200),
-                1,
-                cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        f"SELECTED: {planets[selected_index]['name']}",
+        (40, 70),
+        24,
+        (200,200,200),
+        "Montserrat-Medium.ttf"
+    )
 
-    cv2.putText(frame,
-            f"TIME SCALE: {simulation_speed:.1f}x",
-            (40, 120),
-            cv2.FONT_HERSHEY_DUPLEX,
-            0.6,
-            (0, 255, 255),
-            1,
-            cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        f"TIME SCALE: {simulation_speed:.1f}x",
+        (40, 100),
+        22,
+        (0,255,255),
+        "Montserrat-Medium.ttf"
+    )
 
-    cv2.putText(frame, "Gestures: Rotate | Two Hands = Zoom | Draw = Select | Erase = Reset | Resize = Speed",
-                (40, h - 20),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (180, 180, 180),
-                1,
-                cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        "Gestures: Rotate | Two Hands = Zoom | Draw = Select | Erase = Reset | Resize = Speed",
+        (40, h-40),
+        20,
+        (180,180,180),
+        "Montserrat-Medium.ttf"
+    )
 
     # ==============================
     # Show Frame

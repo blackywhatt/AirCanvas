@@ -5,11 +5,12 @@ import tensorflow as tf
 import pickle
 import os
 import time
+from PIL import ImageFont, ImageDraw, Image
 
 # --- Configuration & Paths ---
 MODEL_PATH = "aircanvas_model.h5"
 LABEL_PATH = "labels.pickle"
-
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
 if not os.path.exists(MODEL_PATH) or not os.path.exists(LABEL_PATH):
     print("Error: Model or Label file not found!")
     exit()
@@ -24,6 +25,30 @@ erasing_index = -1
 erasing_type = "none" # "shape" or "ink"
 imploding_shapes = [] # Stores shapes currently "shrinking" out of existence
 
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w)//2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
 def draw_modern_eraser(frame, x, y, progress):
     # Draw an outer ring
     cv2.circle(frame, (x, y), 25, (100, 100, 100), 2, cv2.LINE_AA)
@@ -31,7 +56,14 @@ def draw_modern_eraser(frame, x, y, progress):
     angle = int((progress / 100) * 360)
     cv2.ellipse(frame, (x, y), (25, 25), -90, 0, angle, (0, 0, 255), 3, cv2.LINE_AA)
     if progress > 0:
-        cv2.putText(frame, f"{progress}%", (x+30, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            f"{progress}%",
+            (x + 30, y - 20),
+            18,
+            (255,255,255),
+            "Montserrat-Medium.ttf"
+        )
 
 # --- Modern UI Helpers ---
 def draw_ui_accent(img, active_gesture, depth_val):
@@ -44,12 +76,37 @@ def draw_ui_accent(img, active_gesture, depth_val):
     cv2.line(img, (20, 20), (50, 20), (0, 0, 255), 2)
     cv2.line(img, (20, 20), (20, 50), (0, 0, 255), 2)
 
-    cv2.putText(img, "SYSTEM ACTIVE", (40, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
-    cv2.putText(img, active_gesture.upper(), (40, 70), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
+    img = draw_text(
+        img,
+        "SYSTEM ACTIVE",
+        (40, 30),
+        20,
+        (150,150,150),
+        "Montserrat-Medium.ttf"
+    )   
+
+    img = draw_text(
+        img,
+        active_gesture.upper(),
+        (40, 55),
+        28,
+        (255,255,255),
+        "Orbitron-Bold.ttf"
+    )
 
     fill_h = int((h - 300) * depth_val)
     cv2.rectangle(img, (w-45, h-155), (w-25, h-155-fill_h), (0, 255, 255), -1)
-    cv2.putText(img, "DEPTH", (w-65, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    img = draw_text(
+        img,
+        "DEPTH",
+        (img.shape[1]-80, 120),
+        18,
+        (255,255,255),
+        "Montserrat-Medium.ttf"
+    )
+
+    return img
 
 def project_3d(x, y, z, w, h, ax, ay):
     cx, cy = x - w//2, y - h//2
@@ -292,12 +349,12 @@ while cap.isOpened():
             s.draw(frame, is_selected=True)
 
     if erase_progress > 0:
-        draw_modern_eraser(frame, ix, iy, erase_progress)
+        frame = draw_modern_eraser(frame, ix, iy, erase_progress)
 
     if len(current_stroke) > 1:
         cv2.polylines(frame, [np.array(current_stroke, np.int32)], False, (0, 255, 255), 2, cv2.LINE_AA)
 
-    draw_ui_accent(frame, active_gesture, target_depth_ui)
+    frame = draw_ui_accent(frame, active_gesture, target_depth_ui)
     cv2.imshow(window_name, frame)
     if not maximized:
         cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)

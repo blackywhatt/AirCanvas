@@ -7,15 +7,41 @@ import queue
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 import math
+from PIL import ImageFont, ImageDraw, Image
 
 # --- Setup Vosk ---
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_PATH, "model")
 vosk_model = Model(MODEL_PATH)
+FONT_DIR = os.path.join(BASE_PATH, "fonts")
 
 list_of_commands = '["circle", "square", "triangle", "select circle", "select square", "select triangle", "red", "green", "blue", "clear", "reset", "delete shape", "bigger", "smaller", "left", "right", "up", "down", "three d", "two d", "rotate", "next shape", "previous shape", "[unk]"]'
 rec = KaldiRecognizer(vosk_model, 16000, list_of_commands)
 audio_queue = queue.Queue()
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 def audio_callback(indata, frames, time, status):
     audio_queue.put(np.frombuffer(indata, dtype=np.int16).tobytes())
@@ -222,7 +248,14 @@ def start_voice_mode():
             
             mic_color = (0, 255, 0) if (pulse // 15) % 2 == 0 else (0, 100, 0)
             cv2.circle(frame, (40, 40), 12, mic_color, -1)
-            cv2.putText(frame, "LISTENING", (70, 52), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
+            frame = draw_text(
+                frame,
+                "LISTENING",
+                (70, 25),
+                24,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
             if current_shape:
                 view_mode = "3D" if current_shape.is_3d else "2D"
@@ -234,8 +267,15 @@ def start_voice_mode():
                 rotate_status = "OFF"
 
             status = f"MODE: {view_mode} | SHAPE: {shape_name} | ROTATE: {rotate_status}"
-            cv2.putText(frame, status, (W//2 - 250, 52), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 255, 255), 1)
-            
+            frame = draw_text(
+                frame,
+                status,
+                (0, 25),
+                28,
+                (0,255,255),
+                "Orbitron-Bold.ttf",
+                center=True
+            )            
             cv2.imshow(window_name, frame)
 
             if cv2.waitKey(1) & 0xFF == ord('b'): break

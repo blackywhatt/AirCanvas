@@ -7,6 +7,8 @@ from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QInputDialog
 import sys
 import time
+from PIL import ImageFont, ImageDraw, Image
+
 
 qt_app = QApplication.instance()
 if not qt_app:
@@ -32,10 +34,35 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_SRC = os.path.dirname(BASE_DIR)
 SESSION_FOLDER = os.path.join(PROJECT_SRC, "sessions")
 os.makedirs(SESSION_FOLDER, exist_ok=True)
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
 # erase
 erase_progress = 0
 selected_index = -1
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w)//2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 def draw_modern_eraser(frame, x, y, progress):
     cv2.circle(frame, (x, y), 25, (100, 100, 100), 2, cv2.LINE_AA)
@@ -198,21 +225,28 @@ while cap.isOpened():
     if erase_progress > 0:
         draw_modern_eraser(frame, ix, iy, erase_progress)
 
-    cv2.putText(frame, "FREE DRAW MODE", (40, 60),
-                cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 255, 255), 1, cv2.LINE_AA)
+    frame = draw_text(
+        frame,
+        "FREE DRAW MODE",
+        (0, 30),
+        36,
+        (255,255,255),
+        "Orbitron-Bold.ttf",
+        center=True
+    )
 
     # =============================
     # AUTOSAVE FLASH MESSAGE
     # =============================
     if time.time() - autosave_flash_time < FLASH_DURATION:
-        cv2.putText(frame,
-                    "Autosaved",
-                    (40, 95),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.6,
-                    (0, 255, 0),
-                    2,
-                    cv2.LINE_AA)
+        frame = draw_text(
+            frame,
+            "Autosaved",
+            (40, 80),
+            26,
+            (0,255,0),
+            "Montserrat-SemiBold.ttf"
+        )
 
     cv2.imshow(window_name, frame)
 

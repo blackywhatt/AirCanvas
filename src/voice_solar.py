@@ -7,13 +7,14 @@ import queue
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 from datetime import datetime
+from PIL import ImageFont, ImageDraw, Image
 
 # ==============================
 # VOICE SETUP
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model")
-
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 vosk_model = Model(MODEL_PATH)
 
 voice_commands = """
@@ -73,6 +74,30 @@ ax, ay = 0.0, 0.0
 
 simulation_speed = 1.0
 selected_index = 0
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w)//2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 # ==============================
 # 3D Projection
@@ -144,18 +169,16 @@ def draw_info_panel(frame, planet, px, py):
 
     for i, line in enumerate(lines):
 
-        font_scale = 0.6 if i == 0 else 0.5
-        thickness = 2 if i == 0 else 1
+        size = 22 if i == 0 else 18
+        font_name = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
 
-        cv2.putText(
+        frame = draw_text(
             frame,
             line,
-            (panel_x + 10, y_offset),
-            cv2.FONT_HERSHEY_DUPLEX,
-            font_scale,
+            (panel_x + 10, y_offset - 15),
+            size,
             (255,255,255),
-            thickness,
-            cv2.LINE_AA
+            font_name
         )
 
         y_offset += 22
@@ -301,25 +324,55 @@ with sd.RawInputStream(
             cv2.circle(frame,(px,py),p["radius"],color,-1)
 
             if i==selected_index:
-                cv2.putText(frame,p["name"],(px-40,py-40),
-                            cv2.FONT_HERSHEY_DUPLEX,0.7,(255,255,255),2)
+                frame = draw_text(
+                    frame,
+                    p["name"],
+                    (px - 40, py - 60),
+                    24,
+                    (255,255,255),
+                    "Montserrat-SemiBold.ttf"
+                )
                 draw_info_panel(frame, p, px, py)
                 
         # ==============================
         # UI
         # ==============================
-        cv2.putText(frame,"VOICE SOLAR SYSTEM",(40,50),
-                    cv2.FONT_HERSHEY_DUPLEX,1,(255,255,255),2)
+        frame = draw_text(
+            frame,
+            "VOICE SOLAR SYSTEM",
+            (0, 20),
+            36,
+            (255,255,255),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
 
-        cv2.putText(frame,f"SELECTED: {planets[selected_index]['name']}",(40,90),
-                    cv2.FONT_HERSHEY_DUPLEX,0.7,(200,200,200),1)
+        frame = draw_text(
+            frame,
+            f"SELECTED: {planets[selected_index]['name']}",
+            (40, 70),
+            24,
+            (200,200,200),
+            "Montserrat-Medium.ttf"
+        )
 
-        cv2.putText(frame,f"TIME SCALE: {simulation_speed:.1f}x",(40,120),
-                    cv2.FONT_HERSHEY_DUPLEX,0.6,(0,255,255),1)
+        frame = draw_text(
+            frame,
+            f"TIME SCALE: {simulation_speed:.1f}x",
+            (40, 100),
+            22,
+            (0,255,255),
+            "Montserrat-Medium.ttf"
+        )
 
-        cv2.putText(frame,
-        "Voice: rotate left/right | tilt up/down | zoom in/out | faster/slower | select planet",
-        (40,h-20),cv2.FONT_HERSHEY_SIMPLEX,0.5,(180,180,180),1)
+        frame = draw_text(
+            frame,
+            "Voice: rotate left/right | tilt up/down | zoom in/out | faster/slower | select planet",
+            (40, h-40),
+            20,
+            (180,180,180),
+            "Montserrat-Medium.ttf"
+        )
 
         cv2.imshow(window_name,frame)
 
