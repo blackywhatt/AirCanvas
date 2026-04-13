@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
 from gesture_engine import get_gesture
+import os
+from PIL import ImageFont, ImageDraw, Image
 
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 # ==============================
 # Canvas Setup
 # ==============================
@@ -11,6 +14,30 @@ draw_color = (0,255,255)
 brush_thickness = 5
 
 prev_x, prev_y = 0, 0
+
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
 
 # ==============================
 # Camera Setup
@@ -38,12 +65,15 @@ while cap.isOpened():
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
 
     # Instruction
-    cv2.putText(frame,"Free Drawing Mode",
-                (40,60),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        "Free Drawing Mode",
+        (0, 30),
+        36,
+        (255,255,255),
+        "Orbitron-Bold.ttf",
+        center=True
+    )
 
     # ==============================
     # Drawing Logic

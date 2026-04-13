@@ -3,7 +3,10 @@ import numpy as np
 import random
 from gesture_engine import get_gesture
 from lesson_engine import LessonEngine
+import os
+from PIL import ImageFont, ImageDraw, Image
 
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 hover_planet = None
 hover_frames = 0
 HOVER_THRESHOLD = 25
@@ -67,6 +70,30 @@ cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 answer_cooldown = 0
 
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
 # ==============================
 # Detect selection
 # ==============================
@@ -102,12 +129,14 @@ def draw_planet(frame, name, x, y, highlight=False):
 
     cv2.circle(frame, (x,y), 70, color, -1)
 
-    cv2.putText(frame, name.upper(),
-                (x-80, y+110),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.8,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        name.upper(),
+        (x - 60, y + 90),
+        24,
+        (255,255,255),
+        "Montserrat-SemiBold.ttf"
+    )
 
 
 # ==============================
@@ -131,16 +160,19 @@ while cap.isOpened():
         q = lesson.get_current_question()
 
         # Question
-        cv2.putText(frame,q["question"],
-                    (100,80),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            q["question"],
+            (0, 40),
+            36,
+            (255,255,255),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
 
         # Draw planets
-        draw_planet(frame, q["left"], 400, 350, hover_planet == q["left"])
-        draw_planet(frame, q["right"], 900, 350, hover_planet == q["right"])
+        frame = draw_planet(frame, q["left"], 400, 350, hover_planet == q["left"])
+        frame = draw_planet(frame, q["right"], 900, 350, hover_planet == q["right"])
 
         # Interaction
         if hand_count > 0 and len(index_positions) > 0:
@@ -167,35 +199,43 @@ while cap.isOpened():
 
         # Feedback
         if lesson.feedback == "correct":
-            cv2.putText(frame,"Correct!",
-                        (40,150),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,255,0),
-                        2)
+            frame = draw_text(
+                frame,
+                "Correct!",
+                (40, 100),
+                30,
+                (0,255,0),
+                "Montserrat-SemiBold.ttf"
+            )
 
         elif lesson.feedback == "wrong":
-            cv2.putText(frame,"Try Again",
-                        (40,150),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        1,
-                        (0,0,255),
-                        2)
+            frame = draw_text(
+                frame,
+                "Try Again",
+                (40, 100),
+                30,
+                (0,0,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
     else:
-        cv2.putText(frame,"Lesson Complete!",
-                    (40,60),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            "Lesson Complete!",
+            (40, 30),
+            36,
+            (0,255,255),
+            "Orbitron-Bold.ttf"
+        )
 
-        cv2.putText(frame,f"Score: {lesson.score}",
-                    (40,120),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (255,255,255),
-                    2)
+        frame = draw_text(
+            frame,
+            f"Score: {lesson.score}",
+            (40, 80),
+            30,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
     if answer_cooldown > 0:
         answer_cooldown -= 1

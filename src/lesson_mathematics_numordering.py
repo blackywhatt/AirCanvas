@@ -2,6 +2,10 @@ import cv2
 import numpy as np
 import random
 from gesture_engine import get_gesture
+import os
+from PIL import ImageFont, ImageDraw, Image
+
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 
 hover_number = None
 hover_frames = 0
@@ -39,6 +43,30 @@ cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 answer_cooldown = 0
 feedback = None
 
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
 # ==============================
 # Detect selection
 # ==============================
@@ -70,12 +98,14 @@ while cap.isOpened():
     # ==============================
     # Draw Instruction
     # ==============================
-    cv2.putText(frame,"Select numbers from SMALLEST to LARGEST",
-                (40,60),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        "Select numbers from SMALLEST to LARGEST",
+        (40, 30),
+        36,
+        (255,255,255),
+        "Orbitron-Bold.ttf"
+    )
 
     # ==============================
     # Draw Numbers
@@ -89,22 +119,26 @@ while cap.isOpened():
         else:
             color = (255,255,255)
 
-        cv2.putText(frame, num,
-                    (x-20, y+20),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    2,
-                    color,
-                    3)
+        frame = draw_text(
+            frame,
+            num,
+            (x - 15, y - 25),
+            48,
+            color,
+            "Montserrat-SemiBold.ttf"
+        )
 
     # ==============================
     # Draw Progress
     # ==============================
-    cv2.putText(frame,"Your Order: " + " ".join(selected_sequence),
-                (40,120),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (0,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        "Your Order: " + " ".join(selected_sequence),
+        (40, 80),
+        30,
+        (0,255,255),
+        "Montserrat-Medium.ttf"
+    )
 
     # ==============================
     # Hand Interaction
@@ -144,32 +178,39 @@ while cap.isOpened():
     # Feedback
     # ==============================
     if feedback == "correct_step":
-        cv2.putText(frame,"Good!",
-                    (40,180),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0,255,0),
-                    2)
+        frame = draw_text(
+            frame,
+            "Good!",
+            (40, 130),
+            30,
+            (0,255,0),
+            "Montserrat-SemiBold.ttf"
+        )
 
     elif feedback == "wrong":
-        cv2.putText(frame,"Wrong Order! Try Again",
-                    (40,180),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    1,
-                    (0,0,255),
-                    2)
+        frame = draw_text(
+            frame,
+            "Wrong Order! Try Again",
+            (40, 130),
+            30,
+            (0,0,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
     # ==============================
     # Completed
     # ==============================
     if selected_sequence == correct_sequence:
 
-        cv2.putText(frame,"Completed!",
-                    (500,500),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    2,
-                    (0,255,255),
-                    3)
+        frame = draw_text(
+            frame,
+            "Completed!",
+            (0, 300),
+            60,
+            (0,255,255),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
 
     # cooldown
     if answer_cooldown > 0:

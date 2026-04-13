@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
 from gesture_engine import get_gesture
+import os
+from PIL import ImageFont, ImageDraw, Image
 
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 hover_planet = None
 hover_frames = 0
 HOVER_THRESHOLD = 25
@@ -39,6 +42,30 @@ window_name = "Planet Information Exploration"
 cv2.namedWindow(window_name,cv2.WINDOW_NORMAL)
 cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        font = ImageFont.load_default()
+
+    if center:
+        w = frame.shape[1]
+        bbox = draw.textbbox((0,0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (w - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(img_pil)
+
 # ==============================
 # Detect selection
 # ==============================
@@ -51,7 +78,6 @@ def detect_selected(ix, iy):
             return name
 
     return None
-
 
 # ==============================
 # Draw Planet
@@ -69,13 +95,14 @@ def draw_planet(frame, name, x, y, hover=False):
 
     cv2.circle(frame, (x,y), 50, color, -1)
 
-    cv2.putText(frame, name.upper(),
-                (x-60, y+90),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (255,255,255),
-                2)
-
+    frame = draw_text(
+        frame,
+        name.upper(),
+        (x - 50, y + 80),
+        22,
+        (255,255,255),
+        "Montserrat-SemiBold.ttf"
+    )
 
 # ==============================
 # Draw Info Panel
@@ -88,41 +115,50 @@ def draw_info_panel(frame, planet):
 
     cv2.rectangle(frame, (900,150), (1250,500), (50,50,50), -1)
 
-    cv2.putText(frame, planet.upper(),
-                (920,200),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (0,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        planet.upper(),
+        (920, 180),
+        28,
+        (0,255,255),
+        "Orbitron-Bold.ttf"
+    )
 
-    cv2.putText(frame, f"Type: {info['type']}",
-                (920,260),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        f"Type: {info['type']}",
+        (920, 240),
+        24,
+        (255,255,255),
+        "Montserrat-Medium.ttf"
+    )
 
-    cv2.putText(frame, f"Moons: {info['moons']}",
-                (920,310),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        f"Moons: {info['moons']}",
+        (920, 280),
+        24,
+        (255,255,255),
+        "Montserrat-Medium.ttf"
+    )
 
-    cv2.putText(frame, f"Fact:",
-                (920,360),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        "Fact:",
+        (920, 330),
+        24,
+        (255,255,255),
+        "Montserrat-SemiBold.ttf"
+    )
 
-    cv2.putText(frame, info["fact"],
-                (920,400),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.7,
-                (200,200,200),
-                2)
-
+    frame = draw_text(
+        frame,
+        info["fact"],
+        (920, 370),
+        22,
+        (200,200,200),
+        "Montserrat-Medium.ttf"
+    )
 
 # ==============================
 # Main Loop
@@ -139,17 +175,20 @@ while cap.isOpened():
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
 
     # Instruction
-    cv2.putText(frame,"Select a planet to explore",
-                (40,60),
-                cv2.FONT_HERSHEY_DUPLEX,
-                1,
-                (255,255,255),
-                2)
+    frame = draw_text(
+        frame,
+        "Select a planet to explore",
+        (0, 30),
+        36,
+        (255,255,255),
+        "Orbitron-Bold.ttf",
+        center=True
+    )
 
     # Draw planets
     for name, (x, y) in planet_positions.items():
 
-        draw_planet(frame, name, x, y, hover_planet == name)
+        frame = draw_planet(frame, name, x, y, hover_planet == name)
 
     # Interaction
     if hand_count > 0 and len(index_positions) > 0:
@@ -173,7 +212,7 @@ while cap.isOpened():
 
     # Show info panel
     if selected_planet:
-        draw_info_panel(frame, selected_planet)
+        frame = draw_info_panel(frame, selected_planet)
 
     cv2.imshow(window_name,frame)
 
