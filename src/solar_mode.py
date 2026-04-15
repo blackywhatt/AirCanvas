@@ -34,8 +34,7 @@ SELECT_DELAY = 15   # frames between selections
 # SESSION STORAGE
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_SRC = os.path.dirname(BASE_DIR)
-SESSION_FOLDER = os.path.join(PROJECT_SRC, "sessions")
+SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
 current_session_file = None
@@ -175,6 +174,7 @@ def draw_info_panel(frame, planet, px, py):
 
         y_offset += 22
 
+    return frame
 # ==============================
 # Save Function
 # ==============================
@@ -639,7 +639,7 @@ while cap.isOpened():
             )
 
         if i == selected_index:
-            draw_info_panel(frame, p, px, py)
+            frame = draw_info_panel(frame, p, px, py)
     # ==============================
     # HUD
     # ==============================

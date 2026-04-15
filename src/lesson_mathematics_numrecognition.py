@@ -121,6 +121,11 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if q is None:
+            continue
+        
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         frame = draw_text(
             frame,
@@ -197,6 +202,12 @@ while cap.isOpened():
     # cooldown
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

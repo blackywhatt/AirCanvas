@@ -35,14 +35,14 @@ lesson = LessonEngine(questions)
 # Number Positions
 # ==============================
 number_positions = {
-    "1": (250, 600),
-    "2": (450, 600),
-    "3": (650, 600),
-    "4": (850, 600),
-    "5": (1050, 600),
-    "6": (1150, 600),
-    "7": (1250, 600),
-    "8": (1350, 600)
+    "1": (100, 500),
+    "2": (250, 500),
+    "3": (400, 500),
+    "4": (550, 500),
+    "5": (700, 500),
+    "6": (850, 500),
+    "7": (1000, 500),
+    "8": (1150, 500)
 }
 
 # ==============================
@@ -132,6 +132,11 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if q is None:
+            continue
+
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         # Draw first group
         draw_apples(frame, q["a"], 200)
@@ -253,6 +258,12 @@ while cap.isOpened():
     # cooldown
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

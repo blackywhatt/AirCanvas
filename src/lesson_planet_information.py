@@ -8,9 +8,9 @@ FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 hover_planet = None
 hover_frames = 0
 HOVER_THRESHOLD = 25
-
+selection_cooldown = 0
 selected_planet = None
-
+no_hand_frames = 0
 # ==============================
 # Planet Info
 # ==============================
@@ -82,7 +82,7 @@ def detect_selected(ix, iy):
 # ==============================
 # Draw Planet
 # ==============================
-def draw_planet(frame, name, x, y, hover=False):
+def draw_planet(frame, name, x, y, hover=False, selected=False):
 
     color_map = {
         "mercury": (200,200,200),
@@ -91,7 +91,12 @@ def draw_planet(frame, name, x, y, hover=False):
         "mars": (0,0,255)
     }
 
-    color = (0,255,255) if hover else color_map[name]
+    if selected:
+        color = (0,255,0)
+    elif hover:
+        color = (0,255,255)
+    else:
+        color = color_map[name]
 
     cv2.circle(frame, (x,y), 50, color, -1)
 
@@ -104,6 +109,8 @@ def draw_planet(frame, name, x, y, hover=False):
         "Montserrat-SemiBold.ttf"
     )
 
+    return frame
+
 # ==============================
 # Draw Info Panel
 # ==============================
@@ -114,6 +121,15 @@ def draw_info_panel(frame, planet):
     x_start = 950
 
     cv2.rectangle(frame, (900,150), (1250,500), (50,50,50), -1)
+
+    frame = draw_text(
+        frame,
+        "Planet Info",
+        (920, 140),
+        24,
+        (255,255,255),
+        "Montserrat-SemiBold.ttf"
+    )
 
     frame = draw_text(
         frame,
@@ -160,10 +176,14 @@ def draw_info_panel(frame, planet):
         "Montserrat-Medium.ttf"
     )
 
+    return frame
 # ==============================
 # Main Loop
 # ==============================
 while cap.isOpened():
+
+    if selection_cooldown > 0:
+        selection_cooldown -= 1
 
     ret, frame = cap.read()
     if not ret:
@@ -188,7 +208,14 @@ while cap.isOpened():
     # Draw planets
     for name, (x, y) in planet_positions.items():
 
-        frame = draw_planet(frame, name, x, y, hover_planet == name)
+        frame = draw_planet(
+            frame,
+            name,
+            x,
+            y,
+            hover_planet == name,
+            selected_planet == name
+        )
 
     # Interaction
     if hand_count > 0 and len(index_positions) > 0:
@@ -207,10 +234,26 @@ while cap.isOpened():
                 hover_planet = selected
                 hover_frames = 0
 
-            if hover_frames > HOVER_THRESHOLD:
+            if hover_frames > HOVER_THRESHOLD and selection_cooldown == 0:
                 selected_planet = selected
+                selection_cooldown = 10
 
-    # Show info panel
+        else:
+            hover_planet = None
+            hover_frames = 0
+
+    if hand_count == 0:
+        no_hand_frames += 1
+    else:
+        no_hand_frames = 0
+
+    if no_hand_frames > 30:
+        selected_planet = None
+
+    if hand_count == 0:
+        hover_planet = None
+        hover_frames = 0
+
     if selected_planet:
         frame = draw_info_panel(frame, selected_planet)
 

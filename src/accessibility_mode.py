@@ -5,24 +5,39 @@ import time
 import threading
 from PIL import ImageFont, ImageDraw, Image
 import os
+import queue
+import json
+import sounddevice as sd
+from vosk import Model, KaldiRecognizer
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
+vosk_model = Model(MODEL_PATH)
+
+voice_commands = """
+[
+"clear","red","blue","green",
+"erase","draw"
+]
+"""
+
+rec = KaldiRecognizer(vosk_model, 16000, voice_commands)
+
+audio_queue = queue.Queue()
 
 current_stroke = []
 strokes = []
 VOICE_ENABLED = False
-# ==============================
-# OPTIONAL VOICE SETUP
-# ==============================
-try:
-    import speech_recognition as sr
-    VOICE_ENABLED = True
-except:
-    VOICE_ENABLED = False
 
-DRAW_COLOR = (255, 0, 0)
+current_color = (255, 0, 0)
+thickness = 3
+
 ERASE_MODE = False
 CLEAR_FLAG = False
+
+def audio_callback(indata, frames, time, status):
+    audio_queue.put(bytes(indata))
 
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
               font_name="Montserrat-Medium.ttf", center=False):
@@ -48,55 +63,37 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
 
     return np.array(img_pil)
 
-# ==============================
-# VOICE LISTENER
-# ==============================
-def voice_listener():
-    global DRAW_COLOR, ERASE_MODE, CLEAR_FLAG
-
-    r = sr.Recognizer()
-    mic = sr.Microphone()
-
-    while True:
-        try:
-            with mic as source:
-                audio = r.listen(source, phrase_time_limit=2)
-
-            command = r.recognize_google(audio).lower()
-            print("Voice:", command)
-
-            if "clear" in command:
-                CLEAR_FLAG = True
-            elif "red" in command:
-                DRAW_COLOR = (0, 0, 255)
-            elif "blue" in command:
-                DRAW_COLOR = (255, 0, 0)
-            elif "green" in command:
-                DRAW_COLOR = (0, 255, 0)
-            elif "erase" in command:
-                ERASE_MODE = True
-            elif "draw" in command:
-                ERASE_MODE = False
-
-        except:
-            pass
-
 def render_strokes(frame):
+
     for stroke in strokes:
-        pts = np.array(stroke, np.int32)
-        cv2.polylines(frame, [pts], False, (255, 0, 0), 3, cv2.LINE_AA)
+        pts = np.array(stroke["points"], np.int32)
+        cv2.polylines(
+            frame,
+            [pts],
+            False,
+            stroke["color"],
+            stroke["thickness"],
+            cv2.LINE_AA
+        )
 
     if len(current_stroke) > 1:
         pts = np.array(current_stroke, np.int32)
-        cv2.polylines(frame, [pts], False, (255, 0, 0), 3, cv2.LINE_AA)
+        cv2.polylines(
+            frame,
+            [pts],
+            False,
+            current_color,
+            thickness,
+            cv2.LINE_AA
+        )
         
 # ==============================
 # MAIN FUNCTION
 # ==============================
 def run():
 
-    global DRAW_COLOR, ERASE_MODE, CLEAR_FLAG, current_stroke, strokes
-
+    global current_color, thickness, ERASE_MODE, CLEAR_FLAG, current_stroke, strokes
+    command = ""
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -122,207 +119,264 @@ def run():
 
     alpha = 0.30  # smoother
 
-    # Start voice thread
-    if VOICE_ENABLED:
-        threading.Thread(target=voice_listener, daemon=True).start()
-
     window_name = "Accessibility Mode"
 
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    with sd.RawInputStream(
+        samplerate=16000,
+        blocksize=8000,
+        dtype="int16",
+        channels=1,
+        callback=audio_callback):
 
-        frame = cv2.flip(frame, 1)
-        h, w, _ = frame.shape
+        while True:
+            ret, frame = cap.read()
+            while not audio_queue.empty():
 
-        if CLEAR_FLAG:
-            strokes.clear()
-            current_stroke.clear()
-            CLEAR_FLAG = False
+                data = audio_queue.get()
 
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = face_mesh.process(rgb)
+                if rec.AcceptWaveform(data):
 
-        status_text = "Tracking face"
+                    result = json.loads(rec.Result())
+                    command = result["text"]
 
-        if results.multi_face_landmarks:
-            face = results.multi_face_landmarks[0]
+                    if command:
+                        print("Voice:", command)
 
+                        if "clear" in command:
+                            CLEAR_FLAG = True
+
+                        elif "red" in command:
+                            current_color = (0, 0, 255)
+
+                        elif "blue" in command:
+                            current_color = (255, 0, 0)
+
+                        elif "green" in command:
+                            current_color = (0, 255, 0)
+
+                        elif "erase" in command:
+                            strokes.clear()
+
+                        elif "draw" in command:
+                            ERASE_MODE = False
+
+                        elif "bigger" in command:
+                            thickness = min(thickness + 1, 15)
+
+                        elif "smaller" in command:
+                            thickness = max(thickness - 1, 1)
+
+                        elif "undo" in command and strokes:
+                            strokes.pop()
+
+            if not ret:
+                break
+
+            frame = cv2.flip(frame, 1)
+            h, w, _ = frame.shape
+
+            if CLEAR_FLAG:
+                strokes.clear()
+                current_stroke.clear()
+                CLEAR_FLAG = False
+
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = face_mesh.process(rgb)
+
+            status_text = "Tracking face"
+
+            if results.multi_face_landmarks:
+                face = results.multi_face_landmarks[0]
+
+                # ======================
+                # FULL FACE CENTER (ULTRA STABLE)
+                # ======================
+                landmarks = np.array([(lm.x, lm.y) for lm in face.landmark])
+                center_x, center_y = landmarks.mean(axis=0)
+
+                scale = 1.5
+
+                raw_x = int((center_x - 0.5) * scale * w + w / 2)
+                raw_y = int((center_y - 0.5) * scale * h + h / 2)
+
+                # Clamp inside screen
+                raw_x = max(0, min(w, raw_x))
+                raw_y = max(0, min(h, raw_y))
+
+                # Bounding box, buang if buruk
+                x_min = int(np.min(landmarks[:, 0]) * w)
+                y_min = int(np.min(landmarks[:, 1]) * h)
+                x_max = int(np.max(landmarks[:, 0]) * w)
+                y_max = int(np.max(landmarks[:, 1]) * h)
+
+                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+
+                mp_drawing = mp.solutions.drawing_utils
+                mp_styles = mp.solutions.drawing_styles
+
+                mp_drawing.draw_landmarks(
+                    frame,
+                    face,
+                    mp_face.FACEMESH_TESSELATION,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_styles.get_default_face_mesh_tesselation_style()
+                )
+
+                # Draw ONLY center (clean look)
+                cv2.circle(frame, (raw_x, raw_y), 6, (0, 255, 255), -1)
+
+                cx = int(alpha * raw_x + (1 - alpha) * prev_x)
+                cy = int(alpha * raw_y + (1 - alpha) * prev_y)
+
+                # DEAD ZONE
+                if abs(cx - prev_x) < 5:
+                    cx = prev_x
+                if abs(cy - prev_y) < 5:
+                    cy = prev_y
+
+                # LIMIT SPEED
+                max_step = 80
+                dx = cx - prev_x
+                dy = cy - prev_y
+                dx = max(-max_step, min(max_step, dx))
+                dy = max(-max_step, min(max_step, dy))
+                cx = prev_x + dx
+                cy = prev_y + dy
+
+                # ======================
+                # DWELL DETECTION
+                # ======================
+                if abs(cx - prev_x) < 10 and abs(cy - prev_y) < 10:
+                    if dwell_start is None:
+                        dwell_start = time.time()
+                    else:
+                        elapsed = time.time() - dwell_start
+
+                        # Draw progress circle
+                        progress = int((elapsed / DWELL_TIME) * 360)
+                        # Background circle
+                        cv2.circle(frame, (cx, cy), 20, (80, 80, 80), 1)
+
+                        # Progress arc (starts from top)
+                        cv2.ellipse(frame, (cx, cy), (20, 20),
+                                    -90, 0, progress, (0, 255, 255), 3)
+
+                        if elapsed > DWELL_TIME:
+                            drawing = True
+                            status_text = "Drawing..."
+                else:
+                    dwell_start = None
+                    drawing = False
+
+                prev_x, prev_y = cx, cy
+
+                # Draw cursor
+                cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 2)
+                cv2.circle(frame, (cx, cy), 3, (0, 255, 0), -1)
+
+                # ======================
+                # DRAWING
+                # ======================
+                if drawing:
+                    if len(current_stroke) > 0:
+                        prev_pt = current_stroke[-1]
+
+                        # interpolate points between previous and current
+                        steps = 5
+                        for i in range(1, steps + 1):
+                            ix = int(prev_pt[0] + (cx - prev_pt[0]) * i / steps)
+                            iy = int(prev_pt[1] + (cy - prev_pt[1]) * i / steps)
+                            current_stroke.append((ix, iy))
+                    else:
+                        current_stroke.append((cx, cy))
+                else:
+                    if len(current_stroke) > 2:
+                        strokes.append({
+                            "points": current_stroke.copy(),
+                            "color": current_color,
+                            "thickness": thickness
+                        })
+                    current_stroke.clear()
+
+            else:
+                status_text = "Face not detected"
+
+            render_strokes(frame)
+            combined = frame
             # ======================
-            # FULL FACE CENTER (ULTRA STABLE)
+            # UI PANEL
             # ======================
-            landmarks = np.array([(lm.x, lm.y) for lm in face.landmark])
-            center_x, center_y = landmarks.mean(axis=0)
+            cv2.rectangle(combined, (0, 0), (w, 50), (30, 30, 30), -1)
 
-            scale = 1.5
+            mode_text = "ERASE" if ERASE_MODE else "DRAW"
+            color_text = f"Color: {current_color}"
 
-            raw_x = int((center_x - 0.5) * scale * w + w / 2)
-            raw_y = int((center_y - 0.5) * scale * h + h / 2)
-
-            # Clamp inside screen
-            raw_x = max(0, min(w, raw_x))
-            raw_y = max(0, min(h, raw_y))
-
-            # Bounding box, buang if buruk
-            x_min = int(np.min(landmarks[:, 0]) * w)
-            y_min = int(np.min(landmarks[:, 1]) * h)
-            x_max = int(np.max(landmarks[:, 0]) * w)
-            y_max = int(np.max(landmarks[:, 1]) * h)
-
-            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
-
-            mp_drawing = mp.solutions.drawing_utils
-            mp_styles = mp.solutions.drawing_styles
-
-            mp_drawing.draw_landmarks(
-                frame,
-                face,
-                mp_face.FACEMESH_TESSELATION,
-                landmark_drawing_spec=None,
-                connection_drawing_spec=mp_styles.get_default_face_mesh_tesselation_style()
+            combined = draw_text(
+                combined,
+                "Accessibility Mode",
+                (20, 15),
+                24,
+                (255,255,255),
+                "Orbitron-Bold.ttf"
             )
 
-            # Draw ONLY center (clean look)
-            cv2.circle(frame, (raw_x, raw_y), 6, (0, 255, 255), -1)
+            combined = draw_text(
+                combined,
+                status_text,
+                (280, 15),
+                22,
+                (0,255,255),
+                "Montserrat-Medium.ttf"
+            )
 
-            cx = int(alpha * raw_x + (1 - alpha) * prev_x)
-            cy = int(alpha * raw_y + (1 - alpha) * prev_y)
+            combined = draw_text(
+                combined,
+                mode_text,
+                (520, 15),
+                22,
+                (0,255,0),
+                "Montserrat-SemiBold.ttf"
+            )
 
-            # DEAD ZONE
-            if abs(cx - prev_x) < 5:
-                cx = prev_x
-            if abs(cy - prev_y) < 5:
-                cy = prev_y
+            combined = draw_text(
+                combined,
+                color_text,
+                (700, 15),
+                20,
+                (255,255,255),
+                "Montserrat-Medium.ttf"
+            )
 
-            # LIMIT SPEED
-            max_step = 80
-            dx = cx - prev_x
-            dy = cy - prev_y
-            dx = max(-max_step, min(max_step, dx))
-            dy = max(-max_step, min(max_step, dy))
-            cx = prev_x + dx
-            cy = prev_y + dy
+            voice_text = command
 
-            # ======================
-            # DWELL DETECTION
-            # ======================
-            if abs(cx - prev_x) < 10 and abs(cy - prev_y) < 10:
-                if dwell_start is None:
-                    dwell_start = time.time()
-                else:
-                    elapsed = time.time() - dwell_start
+            combined = draw_text(
+                combined,
+                f"Voice: {voice_text}",
+                (40, 80),
+                20,
+                (255,255,0),
+                "Montserrat-Medium.ttf"
+            )
 
-                    # Draw progress circle
-                    progress = int((elapsed / DWELL_TIME) * 360)
-                    # Background circle
-                    cv2.circle(frame, (cx, cy), 20, (80, 80, 80), 1)
+            cv2.imshow(window_name, combined)
 
-                    # Progress arc (starts from top)
-                    cv2.ellipse(frame, (cx, cy), (20, 20),
-                                -90, 0, progress, (0, 255, 255), 3)
+            key = cv2.waitKey(1) & 0xFF
 
-                    if elapsed > DWELL_TIME:
-                        drawing = True
-                        status_text = "Drawing..."
-            else:
-                dwell_start = None
-                drawing = False
+            if key == ord('b'):
+                break
 
-            prev_x, prev_y = cx, cy
+            if key == ord('f'):
+                cv2.setWindowProperty(window_name,
+                    cv2.WND_PROP_FULLSCREEN,
+                    cv2.WINDOW_FULLSCREEN)
 
-            # Draw cursor
-            cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 2)
-            cv2.circle(frame, (cx, cy), 3, (0, 255, 0), -1)
-
-            # ======================
-            # DRAWING
-            # ======================
-            if drawing:
-                if len(current_stroke) > 0:
-                    prev_pt = current_stroke[-1]
-
-                    # interpolate points between previous and current
-                    steps = 5
-                    for i in range(1, steps + 1):
-                        ix = int(prev_pt[0] + (cx - prev_pt[0]) * i / steps)
-                        iy = int(prev_pt[1] + (cy - prev_pt[1]) * i / steps)
-                        current_stroke.append((ix, iy))
-                else:
-                    current_stroke.append((cx, cy))
-            else:
-                if len(current_stroke) > 2:
-                    strokes.append(current_stroke.copy())
-                current_stroke.clear()
-
-        else:
-            status_text = "Face not detected"
-
-        render_strokes(frame)
-        combined = frame
-        # ======================
-        # UI PANEL
-        # ======================
-        cv2.rectangle(combined, (0, 0), (w, 50), (30, 30, 30), -1)
-
-        mode_text = "ERASE" if ERASE_MODE else "DRAW"
-        color_text = f"Color: {DRAW_COLOR}"
-
-        combined = draw_text(
-            combined,
-            "Accessibility Mode",
-            (20, 15),
-            24,
-            (255,255,255),
-            "Orbitron-Bold.ttf"
-        )
-
-        combined = draw_text(
-            combined,
-            status_text,
-            (280, 15),
-            22,
-            (0,255,255),
-            "Montserrat-Medium.ttf"
-        )
-
-        combined = draw_text(
-            combined,
-            mode_text,
-            (520, 15),
-            22,
-            (0,255,0),
-            "Montserrat-SemiBold.ttf"
-        )
-
-        combined = draw_text(
-            combined,
-            color_text,
-            (700, 15),
-            20,
-            (255,255,255),
-            "Montserrat-Medium.ttf"
-        )
-
-        cv2.imshow(window_name, combined)
-
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord('q'):
-            break
-
-        if key == ord('f'):
-            cv2.setWindowProperty(window_name,
-                cv2.WND_PROP_FULLSCREEN,
-                cv2.WINDOW_FULLSCREEN)
-
-        if key == ord('w'):
-            cv2.setWindowProperty(window_name,
-                cv2.WND_PROP_FULLSCREEN,
-                cv2.WINDOW_NORMAL)
+            if key == ord('w'):
+                cv2.setWindowProperty(window_name,
+                    cv2.WND_PROP_FULLSCREEN,
+                    cv2.WINDOW_NORMAL)
 
     cap.release()
     cv2.destroyAllWindows()

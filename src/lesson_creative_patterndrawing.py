@@ -128,6 +128,8 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if q is None:
+            continue
 
         # Instruction
         frame = draw_text(
@@ -139,6 +141,9 @@ while cap.isOpened():
             "Orbitron-Bold.ttf",
             center=True
         )
+
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)   
 
         # Draw pattern
         for i, shape in enumerate(q["pattern"]):
@@ -162,7 +167,7 @@ while cap.isOpened():
         # ==============================
         # Interaction
         # ==============================
-        if hand_count > 0 and len(index_positions) > 0:
+        if not lesson.lesson_finished() and hand_count > 0 and len(index_positions) > 0:
 
             ix, iy = index_positions[0]
 
@@ -230,6 +235,15 @@ while cap.isOpened():
 
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    if lesson.lesson_finished() and lesson.finish_timer == 1:
+        hover_option = None
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

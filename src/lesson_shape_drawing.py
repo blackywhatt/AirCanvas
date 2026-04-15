@@ -101,7 +101,7 @@ while cap.isOpened():
     # ==============================
     # DRAWING LOGIC
     # ==============================
-    if hand_count == 1 and ix is not None:
+    if not lesson.lesson_finished() and hand_count == 1 and ix is not None:
 
         # cursor
         cv2.circle(frame,(ix,iy),10,(0,255,255),-1)
@@ -174,6 +174,11 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if q is None:
+            continue
+        
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         frame = draw_text(
             frame,
@@ -229,6 +234,12 @@ while cap.isOpened():
             "Montserrat-SemiBold.ttf"
         )
 
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
+ 
     # ==============================
     # DISPLAY
     # ==============================

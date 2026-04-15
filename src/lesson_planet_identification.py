@@ -14,10 +14,10 @@ HOVER_THRESHOLD = 25
 # Questions
 # ==============================
 questions = [
-    {"question": "Select MERCURY", "answer": "mercury"},
-    {"question": "Select VENUS", "answer": "venus"},
-    {"question": "Select EARTH", "answer": "earth"},
-    {"question": "Select MARS", "answer": "mars"}
+    {"question": "Select the smallest planet near the sun", "answer": "mercury"},
+    {"question": "Select the hottest planet with thick clouds", "answer": "venus"},
+    {"question": "Select the only planet that supports life", "answer": "earth"},
+    {"question": "Select the red planet with huge volcanoes", "answer": "mars"}
 ]
 
 lesson = LessonEngine(questions)
@@ -113,6 +113,7 @@ def draw_planets(frame):
             "Montserrat-SemiBold.ttf"
         )
 
+    return frame
 # ==============================
 # Main Loop
 # ==============================
@@ -138,17 +139,33 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
 
+        if q is None:
+            continue
+
+        frame = draw_text(
+            frame,
+            f"Score: {lesson.score}",
+            (1100, 650),
+            24,
+            (255,255,255),
+            "Montserrat-Medium.ttf"
+        )
+
         frame = draw_text(
             frame,
             q["question"],
-            (0, 30),
+            (0, 80),
             36,
             (255,255,255),
             "Orbitron-Bold.ttf",
             center=True
         )
 
-        if hand_count > 0 and len(index_positions) > 0:
+        if (
+            hand_count > 0
+            and len(index_positions) > 0
+            and lesson.feedback is None
+        ):
 
             ix, iy = index_positions[0]
 
@@ -171,7 +188,7 @@ while cap.isOpened():
                     hover_planet = None
 
         # Feedback
-        if lesson.feedback == "correct":
+        if lesson.feedback == "correct" and lesson.feedback_timer > 0:
             frame = draw_text(
                 frame,
                 "Correct!",
@@ -181,7 +198,7 @@ while cap.isOpened():
                 "Montserrat-SemiBold.ttf"
             )
 
-        elif lesson.feedback == "wrong":
+        elif lesson.feedback == "wrong" and lesson.feedback_timer > 0:
             frame = draw_text(
                 frame,
                 "Try Again",
@@ -214,6 +231,9 @@ while cap.isOpened():
         answer_cooldown -= 1
 
     cv2.imshow(window_name,frame)
+
+    if lesson.should_exit():
+        break
 
     if cv2.waitKey(1) & 0xFF == ord('b'):
         break

@@ -9,30 +9,19 @@ from PIL import ImageFont, ImageDraw, Image
 # ==============================
 # LAYOUT CONFIG (EDIT THIS ONLY)
 # ==============================
-
-# Screen
 CENTER_X = 640
-
-# Question
 QUESTION_POS = (CENTER_X, 60)
-
-# Feedback
 FEEDBACK_POS = (CENTER_X, 110)
 
-# Answer row
 ANSWER_Y = 190
-ANSWER_SPACING = 180   # distance between numbers
+ANSWER_SPACING = 180   
 
-# Shapes area
 SHAPE_Y_MIN = 320
 SHAPE_Y_MAX = 600
 SHAPE_X_MIN = 200
 SHAPE_X_MAX = 1000
 
-# Shape size
 SHAPE_SIZE = 40
-
-# Number circle size
 NUMBER_RADIUS = 45
 
 # ==============================
@@ -119,7 +108,10 @@ def generate_shapes(target_shape):
     return shapes
 
 q = lesson.get_current_question()
-shapes = generate_shapes(q["shape"])
+if q is not None:
+    shapes = generate_shapes(q["shape"])
+else:
+    shapes = []
 
 # ==============================
 # DRAW SHAPE FUNCTION
@@ -185,6 +177,7 @@ while cap.isOpened():
     frame = cv2.resize(frame,(1280,720))
 
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
+    lesson.update()
 
     # ==============================
     # DRAW SHAPES
@@ -235,6 +228,8 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), font_small)   
 
         frame = draw_text(frame, q["question"], QUESTION_POS, font_question, center=True)
 
@@ -254,12 +249,13 @@ while cap.isOpened():
     if answer_cooldown > 0:
         answer_cooldown -= 1
 
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 
     if cv2.waitKey(1) & 0xFF == ord('b'):
         break
-
 
 cap.release()
 cv2.destroyAllWindows()

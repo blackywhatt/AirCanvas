@@ -125,7 +125,7 @@ def draw_info_panel(frame, planet, px, py):
     info = planet.get("info", None)
 
     if not info:
-        return
+        return frame
 
     lines = [
         planet["name"],
@@ -183,6 +183,7 @@ def draw_info_panel(frame, planet, px, py):
 
         y_offset += 22
 
+    return frame
 # ==============================
 # Camera
 # ==============================
@@ -332,7 +333,7 @@ with sd.RawInputStream(
                     (255,255,255),
                     "Montserrat-SemiBold.ttf"
                 )
-                draw_info_panel(frame, p, px, py)
+                frame = draw_info_panel(frame, p, px, py)
                 
         # ==============================
         # UI

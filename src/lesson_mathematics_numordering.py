@@ -4,6 +4,7 @@ import random
 from gesture_engine import get_gesture
 import os
 from PIL import ImageFont, ImageDraw, Image
+from lesson_engine import LessonEngine
 
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 
@@ -19,6 +20,15 @@ numbers_str = [str(n) for n in numbers]
 
 correct_sequence = sorted(numbers_str)
 selected_sequence = []
+
+questions = [
+    {
+        "question": "Order numbers from smallest to largest",
+        "answer": correct_sequence
+    }
+]
+
+lesson = LessonEngine(questions)
 
 # ==============================
 # Positions
@@ -94,18 +104,7 @@ while cap.isOpened():
     frame = cv2.resize(frame,(1280,720))
 
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
-
-    # ==============================
-    # Draw Instruction
-    # ==============================
-    frame = draw_text(
-        frame,
-        "Select numbers from SMALLEST to LARGEST",
-        (40, 30),
-        36,
-        (255,255,255),
-        "Orbitron-Bold.ttf"
-    )
+    lesson.update()
 
     # ==============================
     # Draw Numbers
@@ -166,6 +165,9 @@ while cap.isOpened():
                 if selected_number == expected:
                     selected_sequence.append(selected_number)
                     feedback = "correct_step"
+
+                    if selected_sequence == correct_sequence:
+                        lesson.check_answer(correct_sequence)
                 else:
                     selected_sequence.clear()
                     feedback = "wrong"
@@ -200,11 +202,19 @@ while cap.isOpened():
     # ==============================
     # Completed
     # ==============================
-    if selected_sequence == correct_sequence:
-
+    if not lesson.lesson_finished():
         frame = draw_text(
             frame,
-            "Completed!",
+            "Select numbers from SMALLEST to LARGEST",
+            (40, 30),
+            36,
+            (255,255,255),
+            "Orbitron-Bold.ttf"
+        )
+    else:
+        frame = draw_text(
+            frame,
+            "Lesson Complete!",
             (0, 300),
             60,
             (0,255,255),
@@ -212,9 +222,24 @@ while cap.isOpened():
             center=True
         )
 
+        frame = draw_text(
+            frame,
+            f"Score: {lesson.score}",
+            (40, 80),
+            30,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
+
+    if lesson.lesson_finished() and lesson.finish_timer == 1:
+        selected_sequence.clear()
+
     # cooldown
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

@@ -22,7 +22,7 @@ lesson = LessonEngine(questions)
 shape_sides = {
     "triangle":3,
     "square":4,
-    "circle":0   # treat circle as 0 sides
+    "circle":0   
 }
 
 shape_positions = {
@@ -68,7 +68,6 @@ def generate_pair():
         s2 = random.choice(shapes)
 
     return s1,s2
-
 
 left_shape, right_shape = generate_pair()
 
@@ -129,6 +128,7 @@ while cap.isOpened():
     frame = cv2.resize(frame,(1280,720))
 
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
+    lesson.update()
 
     # ==============================
     # DRAW SHAPES
@@ -147,9 +147,14 @@ while cap.isOpened():
 
         selected = detect_choice(ix,iy)
 
-        if answer_cooldown == 0 and gesture == "draw" and selected:
+        if (not lesson.lesson_finished() and 
+            answer_cooldown == 0 and 
+            gesture == "draw" and 
+            selected):
 
             q = lesson.get_current_question()
+            if q is None:
+                continue
 
             left_sides = shape_sides[left_shape]
             right_sides = shape_sides[right_shape]
@@ -168,8 +173,8 @@ while cap.isOpened():
 
             lesson.check_answer(selected)
 
-            # generate next pair
-            left_shape, right_shape = generate_pair()
+            if not lesson.lesson_finished():
+                left_shape, right_shape = generate_pair()
 
             answer_cooldown = 30
 
@@ -179,6 +184,8 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         frame = draw_text(
             frame,
@@ -231,6 +238,12 @@ while cap.isOpened():
 
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

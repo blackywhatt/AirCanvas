@@ -94,8 +94,7 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
 
 # SESSION STORAGE SYSTEM
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_SRC = os.path.dirname(BASE_DIR)
-SESSION_FOLDER = os.path.join(PROJECT_SRC, "sessions")
+SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
 
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 

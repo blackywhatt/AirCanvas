@@ -6,9 +6,9 @@ import json
 import time
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QTextEdit, QHBoxLayout, QFrame, QGraphicsDropShadowEffect, QListWidget, 
-                             QMessageBox, QInputDialog, QProgressDialog)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QEasingCurve
-from PyQt6.QtGui import QFont, QColor
+                             QMessageBox, QInputDialog, QProgressDialog, QProgressBar)
+from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QEasingCurve, QTimer
+from PyQt6.QtGui import QFont, QColor, QFontDatabase
 
 class AnimatedButton(QPushButton):
     def __init__(self, text, accent_color, parent=None):
@@ -24,7 +24,10 @@ class AnimatedButton(QPushButton):
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-left: 4px solid {accent_color};
                 border-radius: 15px;
-                font-size: 11pt; font-weight: 600; color: #ffffff;
+                font-family: 'Montserrat';
+                font-size: 11pt;
+                font-weight: 600;
+                color: #ffffff;
                 text-align: center; letter-spacing: 2px;
             }}
         """
@@ -33,7 +36,10 @@ class AnimatedButton(QPushButton):
                 background-color: {accent_color};
                 border: 1px solid {accent_color};
                 border-radius: 15px;
-                font-size: 11pt; font-weight: 800; color: #000000;
+                font-family: 'Montserrat';
+                font-size: 11pt;
+                font-weight: 800;
+                color: #000000;
                 text-align: center; letter-spacing: 2px;
             }}
         """
@@ -73,6 +79,36 @@ class AnimatedButton(QPushButton):
             self.anim.setEndValue(self.original_pos)
         self.anim.start()
         super().leaveEvent(event)
+
+def create_back_button(text="Back"):
+    btn = QPushButton(text)
+    btn.setFixedSize(220, 50)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    btn.setStyleSheet("""
+        QPushButton {
+            font-family: 'Montserrat';
+            font-size: 11pt;
+            font-weight: 600;
+
+            color: white;
+            background-color: rgba(255, 255, 255, 0.06);
+
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+        }
+
+        QPushButton:hover {
+            background-color: rgba(239, 68, 68, 0.25);
+            border: 1px solid #ef4444;
+        }
+
+        QPushButton:pressed {
+            background-color: rgba(239, 68, 68, 0.4);
+        }
+    """)
+
+    return btn
 
 class GuideWindow(QWidget):
     def __init__(self, parent_menu):
@@ -212,16 +248,17 @@ class GuideWindow(QWidget):
         self.text_area.setMinimumHeight(500)
         layout.addWidget(self.text_area)
 
-        dismiss_btn = QPushButton("RETURN TO COMMAND CENTER")
+        dismiss_btn = QPushButton("Back to Main Menu")
         dismiss_btn.setFixedHeight(80)
         dismiss_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         dismiss_btn.clicked.connect(self.close)
         dismiss_btn.setStyleSheet("""
             QPushButton {
+                font-family: 'Montserrat';
                 background: white; color: black; font-size: 14pt; font-weight: bold; 
                 border-radius: 20px; letter-spacing: 3px; margin-top: 20px;
             }
-            QPushButton:hover { background: #6366f1; color: white; }
+            QPushButton:hover { background: red; color: white; }
         """)
         layout.addWidget(dismiss_btn)
 
@@ -237,40 +274,83 @@ class LoadingScreen(QWidget):
 
         self.setWindowTitle("AirCanvas Loading")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #0a0a0f;
+            }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(12)
+
+        layout.addStretch()
 
         title = QLabel("AIR CANVAS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""font-size: 70pt; font-weight: 900; color: white; letter-spacing: -2px; """)
+        title.setStyleSheet("""
+            font-family: 'Orbitron';
+            font-size: 72pt;
+            font-weight: 900;
+            color: white;
+            letter-spacing: -1px;
+        """)
 
         msg = QLabel(message)
         msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setStyleSheet("""font-size: 18pt; color: rgba(255,255,255,0.6); margin-top: 20px; """)
+        msg.setStyleSheet("""
+            font-family: 'Montserrat';
+            font-size: 16pt;
+            color: rgba(255,255,255,0.7);
+            margin-top: 10px;
+        """)
 
-        loading = QLabel("Initializing system...")
-        loading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        loading.setStyleSheet("""font-size: 12pt; color: rgba(255,255,255,0.3); margin-top: 10px; """)
+        status = QLabel("Please wait...")
+        status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        status.setStyleSheet("""
+            font-family: 'Montserrat';
+            font-size: 12pt;
+            color: rgba(255,255,255,0.4);
+            margin-top: 5px;
+        """)
 
         layout.addWidget(title)
         layout.addWidget(msg)
-        layout.addWidget(loading)
+        layout.addSpacing(10)
+        layout.addWidget(status)
+
+        layout.addStretch()
 
 class MainMenuGUI(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AirCanvas Interface")
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.setStyleSheet("background-color: #020204; font-family: 'Segoe UI', sans-serif;")
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #0a0a0f;
+                font-family: 'Montserrat';
+            }
+        """)
+
+        FONT_DIR = os.path.join(self.base_path, "fonts")
+        QFontDatabase.addApplicationFont(os.path.join(FONT_DIR, "Orbitron-Bold.ttf"))
+        QFontDatabase.addApplicationFont(os.path.join(FONT_DIR, "Montserrat-Medium.ttf"))
+        QFontDatabase.addApplicationFont(os.path.join(FONT_DIR, "Montserrat-SemiBold.ttf"))
 
         self.master_layout = QVBoxLayout(self)
         self.master_layout.addStretch(1)
-
+        
         title_label = QLabel("AIR CANVAS")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 80pt; font-weight: 900; color: white; letter-spacing: -2px;")
+        title_label.setStyleSheet("""
+            font-family: 'Orbitron';
+            font-size: 80pt;
+            font-weight: 900;
+            color: white;
+            letter-spacing: -1px;
+        """)
         
         glow_line = QFrame()
         glow_line.setFixedSize(400, 1)
@@ -278,7 +358,15 @@ class MainMenuGUI(QWidget):
         
         subtitle = QLabel("SMART CLASSROOM ASSISTANT")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("font-size: 10pt; color: rgba(255,255,255,0.3); font-weight: bold; letter-spacing: 8px; margin-top: 20px; margin-bottom: 50px;")
+        subtitle.setStyleSheet("""
+            font-family: 'Montserrat';
+            font-size: 10pt;
+            color: rgba(255,255,255,0.3);
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin-top: 20px;
+            margin-bottom: 50px;
+        """)
         
         self.master_layout.addWidget(title_label, 0, Qt.AlignmentFlag.AlignCenter)
         self.master_layout.addWidget(glow_line, 0, Qt.AlignmentFlag.AlignCenter)
@@ -392,7 +480,7 @@ class HandModuleWindow(QWidget):
 
         title = QLabel("HAND ENGINE MODULES")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(""" color: white; font-size: 40pt; font-weight: 900; letter-spacing: 10px; """)
+        title.setStyleSheet(""" font-family: 'Orbitron'; color: white; font-size: 40pt; font-weight: 900; letter-spacing: 10px; """)
         layout.addWidget(title)
 
         self.btn_shapes = AnimatedButton("SHAPES MODULE", "#6366f1")
@@ -406,21 +494,8 @@ class HandModuleWindow(QWidget):
         for b in [self.btn_shapes, self.btn_draw, self.btn_solar]:
             layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("RETURN TO MAIN MENU")
-        back_btn.setFixedSize(300, 60)
+        back_btn = create_back_button("Back to Main Menu")
         back_btn.clicked.connect(self.close)
-        back_btn.setStyleSheet("""
-            QPushButton {
-                background: white;
-                color: black;
-                font-weight: bold;
-                border-radius: 15px;
-            }
-            QPushButton:hover {
-                background: #6366f1;
-                color: white;
-            }
-        """)
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def start_shapes_mode(self):
@@ -477,6 +552,7 @@ class VoiceModuleWindow(QWidget):
         title = QLabel("VOICE ENGINE MODULES")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: 'Orbitron';
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -497,21 +573,8 @@ class VoiceModuleWindow(QWidget):
             layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Back button
-        back_btn = QPushButton("RETURN TO MAIN MENU")
-        back_btn.setFixedSize(300, 60)
+        back_btn = create_back_button("Back to Main Menu")
         back_btn.clicked.connect(self.close)
-        back_btn.setStyleSheet("""
-            QPushButton {
-                background: white;
-                color: black;
-                font-weight: bold;
-                border-radius: 15px;
-            }
-            QPushButton:hover {
-                background: #06b6d4;
-                color: white;
-            }
-        """)
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def start_voice_draw(self):
@@ -579,6 +642,7 @@ class SessionManagerWindow(QWidget):
         title = QLabel("SAVED SESSIONS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: 'Orbitron';
             font-size: 42pt;
             font-weight: 900;
             letter-spacing: 10px;
@@ -650,7 +714,7 @@ class SessionManagerWindow(QWidget):
         row2 = QHBoxLayout()
 
         self.btn_refresh = QPushButton("REFRESH")
-        self.btn_back = QPushButton("BACK")
+        self.btn_back = create_back_button("Back")
 
         for btn in [self.btn_refresh, self.btn_back]:
             btn.setFixedHeight(45)
@@ -664,6 +728,7 @@ class SessionManagerWindow(QWidget):
 
         self.btn_load.setStyleSheet("""
         QPushButton {
+            font-family: "Montserrat";
             background: #22c55e;
             color: white;
             border-radius: 12px;
@@ -676,6 +741,7 @@ class SessionManagerWindow(QWidget):
 
         self.btn_rename.setStyleSheet("""
         QPushButton {
+            font-family: "Montserrat";
             background: #6366f1;
             color: white;
             border-radius: 12px;
@@ -688,6 +754,7 @@ class SessionManagerWindow(QWidget):
 
         self.btn_delete.setStyleSheet("""
         QPushButton {
+            font-family: "Montserrat";
             background: #ef4444;
             color: white;
             border-radius: 12px;
@@ -700,6 +767,7 @@ class SessionManagerWindow(QWidget):
 
         self.btn_refresh.setStyleSheet("""
         QPushButton {
+            font-family: "Montserrat";
             background: rgba(255,255,255,0.1);
             color: white;
             border-radius: 12px;
@@ -712,6 +780,7 @@ class SessionManagerWindow(QWidget):
 
         self.btn_back.setStyleSheet("""
         QPushButton {
+            font-family: "Montserrat";
             background: white;
             color: black;
             border-radius: 12px;
@@ -814,13 +883,13 @@ class SessionManagerWindow(QWidget):
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
         if mode == "free_draw":
-            script = os.path.join(base_dir, "hand_mode", "draw_mode.py")
+            script = os.path.join(base_dir, "draw_mode.py")
 
         elif mode == "shapes":
-            script = os.path.join(base_dir, "hand_mode", "shapes_mode.py")
+            script = os.path.join(base_dir, "shapes_mode.py")
 
         elif mode == "solar":
-            script = os.path.join(base_dir, "hand_mode", "solar_mode.py")
+            script = os.path.join(base_dir, "solar_mode.py")
 
         else:
             print("Unknown session mode")
@@ -857,6 +926,7 @@ class LessonMenuWindow(QWidget):
         title = QLabel("LESSONS / ACTIVITY")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: "Orbitron";                
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -877,8 +947,7 @@ class LessonMenuWindow(QWidget):
         for b in [self.btn_geo, self.btn_math, self.btn_sci, self.btn_creative]:
             layout.addWidget(b, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("RETURN TO MAIN MENU")
-        back_btn.setFixedSize(300, 60)
+        back_btn = create_back_button("Back to Main Menu")
         back_btn.clicked.connect(self.close)
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -923,6 +992,7 @@ class GeometryLessonWindow(QWidget):
         title = QLabel("GEOMETRY LESSONS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: "Orbitron";
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -943,9 +1013,8 @@ class GeometryLessonWindow(QWidget):
             btn.clicked.connect(lambda _, f=file: self.run_script(f))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("BACK")
-        back_btn.setFixedSize(300, 60)
-        back_btn.clicked.connect(self.go_back)
+        back_btn = create_back_button("Back")
+        back_btn.clicked.connect(self.go_back)  
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def run_script(self, filename):
@@ -1002,6 +1071,7 @@ class MathLessonWindow(QWidget):
         title = QLabel("MATHEMATICS LESSONS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: "Orbitron";
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -1022,8 +1092,7 @@ class MathLessonWindow(QWidget):
             btn.clicked.connect(lambda _, f=file: self.run_script(f))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("BACK")
-        back_btn.setFixedSize(300, 60)
+        back_btn = create_back_button("Back")
         back_btn.clicked.connect(self.go_back)
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -1082,6 +1151,7 @@ class ScienceLessonWindow(QWidget):
         title = QLabel("SCIENCE LESSONS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: "Orbitron";
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -1101,9 +1171,8 @@ class ScienceLessonWindow(QWidget):
             btn.clicked.connect(lambda _, f=file: self.run_script(f))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("BACK")
-        back_btn.setFixedSize(300, 60)
-        back_btn.clicked.connect(self.go_back)
+        back_btn = create_back_button("Back")
+        back_btn.clicked.connect(self.go_back)  
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def run_script(self, filename):
@@ -1161,6 +1230,7 @@ class CreativeLessonWindow(QWidget):
         title = QLabel("CREATIVE LEARNING")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
+            font-family: "Orbitron";
             color: white;
             font-size: 40pt;
             font-weight: 900;
@@ -1179,8 +1249,7 @@ class CreativeLessonWindow(QWidget):
             btn.clicked.connect(lambda _, f=file: self.run_script(f))
             layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        back_btn = QPushButton("BACK")
-        back_btn.setFixedSize(300, 60)
+        back_btn = create_back_button("Back")
         back_btn.clicked.connect(self.go_back)
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 

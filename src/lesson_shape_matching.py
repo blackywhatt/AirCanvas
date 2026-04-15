@@ -116,7 +116,7 @@ shape_positions = {
 object_pos = np.array([640,200])
 dragging = False
 drag_offset = np.array([0,0])
-
+drop_cooldown = 0
 # ==============================
 # CAMERA SETUP
 # ==============================
@@ -192,7 +192,10 @@ while cap.isOpened():
 
     if not lesson.lesson_finished():
         q = lesson.get_current_question()
-        obj = q["object"]
+        if q is not None:
+            obj = q["object"]
+        else:
+            obj = None
     else:
         obj = None
 
@@ -212,7 +215,7 @@ while cap.isOpened():
     # DRAG LOGIC (MOVE GESTURE)
     # ==============================
 
-    if hand_count >= 1 and ix is not None:
+    if not lesson.lesson_finished() and hand_count >= 1 and ix is not None:
 
         cv2.circle(frame,(ix,iy),10,(255,255,0),-1)
 
@@ -229,10 +232,12 @@ while cap.isOpened():
 
                 target = detect_shape_target(object_pos[0],object_pos[1])
 
-                if target:
+                if target and drop_cooldown == 0:
                     object_pos[:] = shape_positions[target]
                     lesson.check_answer(target)
                     object_pos[:] = [640,200]
+
+                    drop_cooldown = 20
 
             dragging = False
 
@@ -246,7 +251,8 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
-
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,40), font_small)
         frame = draw_text(frame, q["question"], (40,40), font_large)
 
         if lesson.feedback == "correct":
@@ -260,6 +266,14 @@ while cap.isOpened():
         frame = draw_text(frame, "Lesson Complete!", (640, 60), font_title, (0,255,255), center=True)
         frame = draw_text(frame, f"Score: {lesson.score}", (640, 130), font_medium, center=True)   
 
+    if drop_cooldown > 0:
+        drop_cooldown -= 1
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 

@@ -4,6 +4,7 @@ import random
 from gesture_engine import get_gesture
 import os
 from PIL import ImageFont, ImageDraw, Image
+from lesson_engine import LessonEngine
 
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 hover_planet = None
@@ -28,6 +29,13 @@ planet_order = [
 selected_planets = random.sample(planet_order[:4], 4)  # first 4 planets
 correct_sequence = sorted(selected_planets, key=lambda x: planet_order.index(x))
 
+questions = [{
+    "question": "Order planets from closest to farthest from the Sun",
+    "answer": correct_sequence
+}]
+
+lesson = LessonEngine(questions)
+
 selected_sequence = []
 
 # ==============================
@@ -51,7 +59,6 @@ cv2.namedWindow(window_name,cv2.WINDOW_NORMAL)
 cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 answer_cooldown = 0
-feedback = None
 
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
               font_name="Montserrat-Medium.ttf", center=False):
@@ -125,6 +132,7 @@ def draw_planet(frame, name, x, y, selected=False, hover=False):
         "Montserrat-SemiBold.ttf"
     )
 
+    return frame
 # ==============================
 # Main Loop
 # ==============================
@@ -138,14 +146,14 @@ while cap.isOpened():
     frame = cv2.resize(frame,(1280,720))
 
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
-
+    lesson.update()
     # ==============================
     # Instruction
     # ==============================
     frame = draw_text(
         frame,
         "Select planets from CLOSEST to FARTHEST from the Sun",
-        (0, 30),
+        (0, 50),
         34,
         (255,255,255),
         "Orbitron-Bold.ttf",
@@ -172,16 +180,25 @@ while cap.isOpened():
     frame = draw_text(
         frame,
         "Your Order: " + " → ".join(selected_sequence),
-        (40, 80),
+        (40, 100),
         28,
         (0,255,255),
         "Montserrat-Medium.ttf"
     )
 
+    frame = draw_text(
+        frame,
+        f"{len(selected_sequence)} / {len(correct_sequence)} selected",
+        (40, 150),
+        24,
+        (255,255,255),
+        "Montserrat-Medium.ttf"
+    )
+    
     # ==============================
     # Hand Interaction
     # ==============================
-    if hand_count > 0 and len(index_positions) > 0:
+    if not lesson.lesson_finished() and hand_count > 0 and len(index_positions) > 0:
 
         ix, iy = index_positions[0]
 
@@ -199,37 +216,37 @@ while cap.isOpened():
 
             if hover_frames > HOVER_THRESHOLD and answer_cooldown == 0:
 
-                expected = correct_sequence[len(selected_sequence)]
+                selected_sequence.append(selected)
 
-                if selected == expected:
-                    selected_sequence.append(selected)
-                    feedback = "correct_step"
-                else:
-                    selected_sequence.clear()
-                    feedback = "wrong"
+                if len(selected_sequence) == len(correct_sequence):
+
+                    lesson.check_answer(selected_sequence.copy())
+
+                    if lesson.feedback == "wrong":
+                        selected_sequence.clear()
+
+                    elif lesson.feedback == "correct":
+                        selected_sequence.clear()
 
                 answer_cooldown = 25
                 hover_frames = 0
                 hover_planet = None
 
-    # ==============================
-    # Feedback
-    # ==============================
-    if feedback == "correct_step":
+    if lesson.feedback == "correct":
         frame = draw_text(
             frame,
-            "Good!",
-            (40, 130),
+            "Correct!",
+            (40, 200),
             30,
             (0,255,0),
             "Montserrat-SemiBold.ttf"
         )
 
-    elif feedback == "wrong":
+    elif lesson.feedback == "wrong":
         frame = draw_text(
             frame,
             "Wrong Order! Try Again",
-            (40, 130),
+            (40, 200),
             30,
             (0,0,255),
             "Montserrat-SemiBold.ttf"
@@ -238,7 +255,7 @@ while cap.isOpened():
     # ==============================
     # Completed
     # ==============================
-    if selected_sequence == correct_sequence:
+    if lesson.lesson_finished():
 
         frame = draw_text(
             frame,
@@ -250,7 +267,16 @@ while cap.isOpened():
             center=True
         )
 
-    # cooldown
+        frame = draw_text(
+            frame,
+            f"Score: {lesson.score}",
+            (0, 380),
+            40,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+            center=True
+        )
+
     if answer_cooldown > 0:
         answer_cooldown -= 1
 

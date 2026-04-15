@@ -120,6 +120,8 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if q is None:
+            continue
 
         frame = draw_text(
             frame,
@@ -130,6 +132,9 @@ while cap.isOpened():
             "Orbitron-Bold.ttf",
             center=True
         )
+
+        current, total = lesson.get_progress()
+        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         # Draw shape (circle)
         if selected_fill:
@@ -159,7 +164,7 @@ while cap.isOpened():
         # ==============================
         # Interaction
         # ==============================
-        if hand_count > 0 and len(index_positions) > 0:
+        if not lesson.lesson_finished() and hand_count > 0 and len(index_positions) > 0:
 
             ix, iy = index_positions[0]
 
@@ -183,6 +188,10 @@ while cap.isOpened():
                         selected_fill = selected
 
                     else:
+                        selected_fill = None
+
+                    # reset after feedback finishes
+                    if lesson.feedback == "correct" and lesson.feedback_timer == 1:
                         selected_fill = None
 
                     answer_cooldown = 30
@@ -233,6 +242,15 @@ while cap.isOpened():
 
     if answer_cooldown > 0:
         answer_cooldown -= 1
+
+    if lesson.lesson_finished() and lesson.finish_timer == 1:
+        selected_fill = None
+
+    # ==============================
+    # AUTO EXIT AFTER FINISH
+    # ==============================
+    if lesson.should_exit():
+        break
 
     cv2.imshow(window_name,frame)
 
