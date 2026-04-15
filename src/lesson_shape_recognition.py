@@ -98,27 +98,6 @@ while cap.isOpened():
     lesson.update()
 
     # ==============================
-    # DEBUG INFO
-    # ==============================
-    frame = draw_text(
-        frame,
-        f"Hands: {hand_count}",
-        (40, 140),
-        24,
-        (255,255,0),
-        "Montserrat-Medium.ttf"
-    )
-
-    frame = draw_text(
-        frame,
-        f"Gesture: {gesture}",
-        (40, 170),
-        24,
-        (255,255,0),
-        "Montserrat-Medium.ttf"
-    )
-
-    # ==============================
     # DRAW SHAPES
     # ==============================
 

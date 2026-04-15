@@ -40,10 +40,10 @@ lesson = LessonEngine(questions)
 # Color Button Positions
 # ==============================
 color_positions = {
-    "red": (300,600),
-    "green": (500,600),
-    "blue": (700,600),
-    "yellow": (900,600)
+    "red": (300,480),
+    "green": (500,480),
+    "blue": (700,480),
+    "yellow": (900,480)
 }
 
 selected_fill = None
@@ -155,7 +155,7 @@ while cap.isOpened():
             frame = draw_text(
                 frame,
                 name.upper(),
-                (x - 35, y + 70),
+                (x - 35, y + 60),
                 22,
                 (255,255,255),
                 "Montserrat-SemiBold.ttf"

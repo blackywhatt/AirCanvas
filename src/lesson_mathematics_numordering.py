@@ -109,35 +109,38 @@ while cap.isOpened():
     # ==============================
     # Draw Numbers
     # ==============================
-    for num, (x, y) in number_positions.items():
+    if not lesson.lesson_finished():
 
-        if num in selected_sequence:
-            color = (0,255,0)  # already selected
-        elif hover_number == num:
-            color = (0,255,255)
-        else:
-            color = (255,255,255)
+        for num, (x, y) in number_positions.items():
 
-        frame = draw_text(
-            frame,
-            num,
-            (x - 15, y - 25),
-            48,
-            color,
-            "Montserrat-SemiBold.ttf"
-        )
+            if num in selected_sequence:
+                color = (0,255,0)
+            elif hover_number == num:
+                color = (0,255,255)
+            else:
+                color = (255,255,255)
+
+            frame = draw_text(
+                frame,
+                num,
+                (x - 15, y - 25),
+                48,
+                color,
+                "Montserrat-SemiBold.ttf"
+            )
 
     # ==============================
     # Draw Progress
     # ==============================
-    frame = draw_text(
-        frame,
-        "Your Order: " + " ".join(selected_sequence),
-        (40, 80),
-        30,
-        (0,255,255),
-        "Montserrat-Medium.ttf"
-    )
+    if not lesson.lesson_finished():
+        frame = draw_text(
+            frame,
+            "Your Order: " + " ".join(selected_sequence),
+            (40, 80),
+            30,
+            (0,255,255),
+            "Montserrat-Medium.ttf"
+        )
 
     # ==============================
     # Hand Interaction
@@ -215,7 +218,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Lesson Complete!",
-            (0, 300),
+            (0, 250),
             60,
             (0,255,255),
             "Orbitron-Bold.ttf",
@@ -225,10 +228,11 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             f"Score: {lesson.score}",
-            (40, 80),
-            30,
+            (0, 400),
+            36,
             (255,255,255),
-            "Montserrat-SemiBold.ttf"
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     if lesson.lesson_finished() and lesson.finish_timer == 1:

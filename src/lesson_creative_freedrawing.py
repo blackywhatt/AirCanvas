@@ -85,7 +85,7 @@ while cap.isOpened():
         cv2.circle(frame,(x,y),8,(0,255,255),-1)
 
         # DRAW
-        if gesture == "point":   # adjust based on your gesture system
+        if gesture == "draw":   # adjust based on your gesture system
 
             if prev_x == 0 and prev_y == 0:
                 prev_x, prev_y = x, y
@@ -98,11 +98,11 @@ while cap.isOpened():
             prev_x, prev_y = 0, 0
 
         # CLEAR
-        if gesture == "open":
+        if gesture == "clear":
             canvas[:] = 0
 
         # CHANGE COLOR
-        if gesture == "thumb":
+        if gesture == "pinch":
             draw_color = tuple(np.random.randint(0,255,3).tolist())
 
     # ==============================

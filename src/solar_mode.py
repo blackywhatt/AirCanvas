@@ -4,7 +4,7 @@ import time
 import json
 import os
 import sys
-from datetime import datetime
+# from datetime import datetime
 from gesture_engine import get_gesture
 from PIL import ImageFont, ImageDraw, Image
 
@@ -34,8 +34,8 @@ SELECT_DELAY = 15   # frames between selections
 # SESSION STORAGE
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
-os.makedirs(SESSION_FOLDER, exist_ok=True)
+# SESSION_FOLDER = os.path.join(BASE_DIR, "sessions")
+# os.makedirs(SESSION_FOLDER, exist_ok=True)
 
 current_session_file = None
 
@@ -178,91 +178,91 @@ def draw_info_panel(frame, planet, px, py):
 # ==============================
 # Save Function
 # ==============================
-def save_session(session_name=None):
-    global current_session_file
+# def save_session(session_name=None):
+#     global current_session_file
 
-    if current_session_file is not None:
-        filename = current_session_file
-    else:
-        if not session_name:
-            session_name = "solar_session"
+#     if current_session_file is not None:
+#         filename = current_session_file
+#     else:
+#         if not session_name:
+#             session_name = "solar_session"
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-        filename = f"{session_name}_{timestamp}.json"
-        current_session_file = filename
+#         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+#         filename = f"{session_name}_{timestamp}.json"
+#         current_session_file = filename
 
-    path = os.path.join(SESSION_FOLDER, filename)
+#     path = os.path.join(SESSION_FOLDER, filename)
 
-    planets_data = []
+#     planets_data = []
 
-    for p in planets:
-        planet_data = {
-            "name": p["name"],
-            "orbit": p["orbit"],
-            "radius": p["radius"],
-            "color": p["color"],
-            "angle": p["angle"],
-            "speed": p["speed"]
-        }
+#     for p in planets:
+#         planet_data = {
+#             "name": p["name"],
+#             "orbit": p["orbit"],
+#             "radius": p["radius"],
+#             "color": p["color"],
+#             "angle": p["angle"],
+#             "speed": p["speed"]
+#         }
 
-        if "moon" in p:
-            planet_data["moon"] = p["moon"]
+#         if "moon" in p:
+#             planet_data["moon"] = p["moon"]
 
-        if "ring" in p:
-            planet_data["ring"] = True
+#         if "ring" in p:
+#             planet_data["ring"] = True
 
-        if "info" in p:
-            planet_data["info"] = p["info"]
+#         if "info" in p:
+#             planet_data["info"] = p["info"]
 
-        planets_data.append(planet_data)
+#         planets_data.append(planet_data)
 
-    data = {
-        "mode": "solar",
-        "planets": planets_data,
-        "solar_scale": solar_scale,
-        "ax": ax,
-        "ay": ay,
-        "selected_index": selected_index,
-        "simulation_speed": simulation_speed
-    }
+#     data = {
+#         "mode": "solar",
+#         "planets": planets_data,
+#         "solar_scale": solar_scale,
+#         "ax": ax,
+#         "ay": ay,
+#         "selected_index": selected_index,
+#         "simulation_speed": simulation_speed
+#     }
 
-    with open(path, "w") as f:
-        json.dump(data, f)
+#     with open(path, "w") as f:
+#         json.dump(data, f)
 
-    print(f"[INFO] Solar session saved: {filename}")
+#     print(f"[INFO] Solar session saved: {filename}")
 
 # ==============================
 # Load Function
 # ==============================
-def load_session(filename):
-    global planets, solar_scale, ax, ay, selected_index, simulation_speed, current_session_file
+# def load_session(filename):
+#     global planets, solar_scale, ax, ay, selected_index, simulation_speed, current_session_file
 
-    path = os.path.join(SESSION_FOLDER, filename)
+#     path = os.path.join(SESSION_FOLDER, filename)
 
-    if not os.path.exists(path):
-        return
+#     if not os.path.exists(path):
+#         return
 
-    with open(path, "r") as f:
-        data = json.load(f)
+#     with open(path, "r") as f:
+#         data = json.load(f)
 
-    planets = data.get("planets", planets)
-    solar_scale = data.get("solar_scale", 1.0)
-    ax = data.get("ax", 0.0)
-    ay = data.get("ay", 0.0)
+#     planets = data.get("planets", planets)
+#     solar_scale = data.get("solar_scale", 1.0)
+#     ax = data.get("ax", 0.0)
+#     ay = data.get("ay", 0.0)
     
-    selected_index = data.get("selected_index", 0)
-    simulation_speed = data.get("simulation_speed", 1.0)
+#     selected_index = data.get("selected_index", 0)
+#     simulation_speed = data.get("simulation_speed", 1.0)
 
-    current_session_file = filename
+#     current_session_file = filename
 
-    print(f"[INFO] Solar session loaded: {filename}")
+#     print(f"[INFO] Solar session loaded: {filename}")
 
 # ==============================
 # Camera
 # ==============================
 # auto-load session if launched from menu
-if len(sys.argv) > 2 and sys.argv[1] == "--load":
-    load_session(sys.argv[2])
+# if len(sys.argv) > 2 and sys.argv[1] == "--load":
+#     load_session(sys.argv[2])
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # better quality on Windows
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -691,15 +691,15 @@ while cap.isOpened():
         break
 
     # Save session
-    if key == ord('s'):
+    # if key == ord('s'):
 
-        if current_session_file is not None:
-            save_session()
+    #     if current_session_file is not None:
+    #         save_session()
 
-        else:
-            name = input("Enter session name: ")
-            if name:
-                save_session(name)
+    #     else:
+    #         name = input("Enter session name: ")
+    #         if name:
+    #             save_session(name)
 
 cap.release()
 cv2.destroyAllWindows()

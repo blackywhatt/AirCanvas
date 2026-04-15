@@ -14,10 +14,10 @@ HOVER_THRESHOLD = 25
 # Lesson Questions
 # ==============================
 questions = [
-    {"question": "Select number 1", "answer": "1"},
-    {"question": "Select number 2", "answer": "2"},
-    {"question": "Select number 3", "answer": "3"},
-    {"question": "Select number 4", "answer": "4"}
+    {"question": "Select number ONE", "answer": "1"},
+    {"question": "Select number TWO", "answer": "2"},
+    {"question": "Select number THREE", "answer": "3"},
+    {"question": "Select number FOUR", "answer": "4"}
 ]
 
 lesson = LessonEngine(questions)

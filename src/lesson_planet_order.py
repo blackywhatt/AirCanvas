@@ -43,9 +43,9 @@ selected_sequence = []
 # ==============================
 planet_positions = {}
 
-start_x = 250
+start_x = 200
 for i, planet in enumerate(selected_planets):
-    planet_positions[planet] = (start_x + i * 250, 350)
+    planet_positions[planet] = (start_x + i * 250, 300)
 
 # ==============================
 # Camera Setup
@@ -153,7 +153,7 @@ while cap.isOpened():
     frame = draw_text(
         frame,
         "Select planets from CLOSEST to FARTHEST from the Sun",
-        (0, 50),
+        (0, 40),
         34,
         (255,255,255),
         "Orbitron-Bold.ttf",
@@ -180,7 +180,7 @@ while cap.isOpened():
     frame = draw_text(
         frame,
         "Your Order: " + " → ".join(selected_sequence),
-        (40, 100),
+        (40, 120),
         28,
         (0,255,255),
         "Montserrat-Medium.ttf"
@@ -189,7 +189,7 @@ while cap.isOpened():
     frame = draw_text(
         frame,
         f"{len(selected_sequence)} / {len(correct_sequence)} selected",
-        (40, 150),
+        (40, 160),
         24,
         (255,255,255),
         "Montserrat-Medium.ttf"
@@ -236,7 +236,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Correct!",
-            (40, 200),
+            (40, 220),
             30,
             (0,255,0),
             "Montserrat-SemiBold.ttf"
@@ -246,7 +246,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Wrong Order! Try Again",
-            (40, 200),
+            (40, 220),
             30,
             (0,0,255),
             "Montserrat-SemiBold.ttf"
@@ -260,7 +260,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Completed!",
-            (0, 300),
+            (0, 260),
             60,
             (0,255,255),
             "Orbitron-Bold.ttf",
@@ -270,7 +270,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             f"Score: {lesson.score}",
-            (0, 380),
+            (0, 340),
             40,
             (255,255,255),
             "Montserrat-SemiBold.ttf",
