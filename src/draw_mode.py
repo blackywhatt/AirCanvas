@@ -37,7 +37,15 @@ FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
 # erase
 erase_progress = 0
+clear_progress = 0
 selected_index = -1
+lost_hand_frames = 0
+MAX_LOST_FRAMES = 5
+last_raw_gesture = "idle"
+stable_gesture = "idle"
+same_gesture_frames = 0
+smooth_ix = None
+smooth_iy = None
 
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
               font_name="Montserrat-Medium.ttf", center=False):
@@ -164,10 +172,33 @@ while cap.isOpened():
     frame = cv2.resize(frame, (1280, 720))
 
     gesture, index_positions, thumb_positions, hand_count, frame = get_gesture(frame)
+
+    # Lightweight gesture stabilizer
+    if gesture == last_raw_gesture:
+        same_gesture_frames += 1
+    else:
+        same_gesture_frames = 0
+        last_raw_gesture = gesture
+
+    if same_gesture_frames >= 1:
+        stable_gesture = gesture
+    
     if hand_count >= 1:
-        ix, iy = index_positions[0]
+        raw_x, raw_y = index_positions[0]
+
+        if smooth_ix is None:
+            smooth_ix = raw_x
+            smooth_iy = raw_y
+        else:
+            smooth_ix = int(smooth_ix * 0.45 + raw_x * 0.55)
+            smooth_iy = int(smooth_iy * 0.45 + raw_y * 0.55)
+
+        ix, iy = smooth_ix, smooth_iy
+
     else:
         ix, iy = None, None
+        smooth_ix = None
+        smooth_iy = None
 
     if hand_count >= 1 and ix is not None:
 
@@ -186,7 +217,7 @@ while cap.isOpened():
 
         selected_index = temp_idx
 
-        if gesture == "erase" and selected_index != -1:
+        if stable_gesture == "erase" and selected_index != -1:
             erase_progress += 6
             if erase_progress >= 100:
                 strokes.pop(selected_index)
@@ -198,23 +229,47 @@ while cap.isOpened():
         # =========================
         # DRAW LOGIC
         # =========================
-        if gesture == "draw":
-            current_stroke.append((ix, iy))
+        if stable_gesture == "draw":
+
+            lost_hand_frames = 0
+
+            if len(current_stroke) == 0:
+                current_stroke.append((ix, iy))
+            else:
+                last_x, last_y = current_stroke[-1]
+                dist = np.hypot(ix - last_x, iy - last_y)
+
+                if dist >= 5:
+                    current_stroke.append((ix, iy))
+
         else:
-            if len(current_stroke) > 2:
-                strokes.append({
-                    "points": current_stroke.copy(),
-                    "color": current_color,
-                    "thickness": thickness
-                })
-            current_stroke = []
+            lost_hand_frames += 1
+
+            if lost_hand_frames > MAX_LOST_FRAMES:
+                if len(current_stroke) > 2:
+                    strokes.append({
+                        "points": current_stroke.copy(),
+                        "color": current_color,
+                        "thickness": thickness
+                    })
+
+                current_stroke = []
+                lost_hand_frames = 0
 
         # =========================
         # CLEAR ALL
         # =========================
-        if gesture == "clear":
-            strokes.clear()
-            current_stroke = []
+        if stable_gesture == "clear":
+
+            clear_progress += 4
+
+            if clear_progress >= 100:
+                strokes.clear()
+                current_stroke = []
+                clear_progress = 0
+
+        else:
+            clear_progress = max(0, clear_progress - 6)
 
     # =============================
     # RENDER
@@ -223,6 +278,18 @@ while cap.isOpened():
 
     if erase_progress > 0:
         draw_modern_eraser(frame, ix, iy, erase_progress)
+
+    if clear_progress > 0 and ix is not None:
+        draw_modern_eraser(frame, ix, iy, clear_progress)
+
+        frame = draw_text(
+            frame,
+            "CLEARING...",
+            (ix - 60, iy - 45),
+            22,
+            (0,0,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
     frame = draw_text(
         frame,

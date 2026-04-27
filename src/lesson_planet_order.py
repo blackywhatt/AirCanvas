@@ -25,27 +25,55 @@ planet_order = [
     "neptune"
 ]
 
-# Select subset (for simplicity)
-selected_planets = random.sample(planet_order[:4], 4)  # first 4 planets
-correct_sequence = sorted(selected_planets, key=lambda x: planet_order.index(x))
+questions = [
 
-questions = [{
-    "question": "Order planets from closest to farthest from the Sun",
-    "answer": correct_sequence
-}]
+    {
+        "question":"Order planets from CLOSEST to FURTHEST from Sun",
+        "planets":["earth","mars","venus","mercury"],
+        "answer":["mercury","venus","earth","mars"]
+    },
+
+    {
+        "question":"Order planets from CLOSEST to FURTHEST from Sun",
+        "planets":["neptune","saturn","uranus","jupiter"],
+        "answer":["jupiter","saturn","uranus","neptune"]
+    },
+
+    {
+        "question":"Order planets from CLOSEST to FURTHEST from Sun",
+        "planets":["venus","mars","mercury","earth"],
+        "answer":["mercury","venus","earth","mars"]
+    }
+
+]
 
 lesson = LessonEngine(questions)
-
 selected_sequence = []
-
-# ==============================
-# Positions
-# ==============================
 planet_positions = {}
 
-start_x = 200
-for i, planet in enumerate(selected_planets):
-    planet_positions[planet] = (start_x + i * 250, 300)
+def load_round():
+
+    global selected_sequence
+    global planet_positions
+    global correct_sequence
+
+    selected_sequence.clear()
+    planet_positions.clear()
+
+    q = lesson.get_current_question()
+
+    if q is None:
+        return
+
+    planets = q["planets"]
+    correct_sequence = q["answer"]
+
+    start_x = 200
+
+    for i, planet in enumerate(planets):
+        planet_positions[planet] = (start_x + i * 250, 320)
+
+load_round()  
 
 # ==============================
 # Camera Setup
@@ -150,15 +178,36 @@ while cap.isOpened():
     # ==============================
     # Instruction
     # ==============================
+    q = lesson.get_current_question()
+
+    current, total = lesson.get_progress()
+
+    if current == 0:
+        level = "EASY"
+    elif current == 1:
+        level = "MEDIUM"
+    else:
+        level = "HARD"
+
     frame = draw_text(
         frame,
-        "Select planets from CLOSEST to FARTHEST from the Sun",
-        (0, 40),
-        34,
-        (255,255,255),
-        "Orbitron-Bold.ttf",
-        center=True
+        f"LEVEL: {level}",
+        (980, 90),
+        28,
+        (0,255,255),
+        "Montserrat-SemiBold.ttf"
     )
+
+    if q is not None:
+        frame = draw_text(
+            frame,
+            q["question"],
+            (0, 40),
+            34,
+            (255,255,255),
+            "Orbitron-Bold.ttf",
+            center=True
+        )
 
     # ==============================
     # Draw Planets
@@ -218,15 +267,28 @@ while cap.isOpened():
 
                 selected_sequence.append(selected)
 
-                if len(selected_sequence) == len(correct_sequence):
+                index_now = len(selected_sequence) - 1
 
-                    lesson.check_answer(selected_sequence.copy())
+                # Wrong immediately
+                if selected_sequence[index_now] != correct_sequence[index_now]:
 
-                    if lesson.feedback == "wrong":
-                        selected_sequence.clear()
+                    lesson.feedback = "wrong"
+                    lesson.feedback_timer = 25
+                    selected_sequence.clear()
 
-                    elif lesson.feedback == "correct":
-                        selected_sequence.clear()
+                # Completed correctly
+                elif len(selected_sequence) == len(correct_sequence):
+
+                    lesson.feedback = "correct"
+                    lesson.feedback_timer = 25
+
+                    lesson.score += 1
+                    lesson.current_question += 1
+
+                    selected_sequence.clear()
+
+                    if not lesson.lesson_finished():
+                        load_round()
 
                 answer_cooldown = 25
                 hover_frames = 0

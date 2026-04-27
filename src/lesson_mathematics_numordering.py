@@ -18,17 +18,37 @@ HOVER_THRESHOLD = 25
 numbers = random.sample(range(1,6), 4)  # e.g. [3,1,4,2]
 numbers_str = [str(n) for n in numbers]
 
-correct_sequence = sorted(numbers_str)
 selected_sequence = []
 
 questions = [
-    {
-        "question": "Order numbers from smallest to largest",
-        "answer": correct_sequence
-    }
+    {"question":"Arrange from SMALLEST to LARGEST", "mode":"asc", "answer":"done"},
+    {"question":"Arrange from LARGEST to SMALLEST", "mode":"desc", "answer":"done"},
+    {"question":"Arrange EVEN numbers first", "mode":"even", "answer":"done"},
 ]
 
 lesson = LessonEngine(questions)
+
+def update_correct_sequence():
+
+    global correct_sequence
+
+    q = lesson.get_current_question()
+
+    if q is None:
+        return
+
+    if q["mode"] == "asc":
+        correct_sequence = sorted(numbers_str, key=int)
+
+    elif q["mode"] == "desc":
+        correct_sequence = sorted(numbers_str, key=int, reverse=True)
+
+    elif q["mode"] == "even":
+        evens = [n for n in numbers_str if int(n) % 2 == 0]
+        odds = [n for n in numbers_str if int(n) % 2 == 1]
+        correct_sequence = evens + odds
+
+update_correct_sequence()
 
 # ==============================
 # Positions
@@ -163,6 +183,9 @@ while cap.isOpened():
 
             if hover_frames > HOVER_THRESHOLD and answer_cooldown == 0:
 
+                if len(selected_sequence) >= len(correct_sequence):
+                    continue
+
                 expected = correct_sequence[len(selected_sequence)]
 
                 if selected_number == expected:
@@ -170,7 +193,22 @@ while cap.isOpened():
                     feedback = "correct_step"
 
                     if selected_sequence == correct_sequence:
-                        lesson.check_answer(correct_sequence)
+                        lesson.score += 1
+                        lesson.current_question += 1
+
+                        if not lesson.lesson_finished():
+                            selected_sequence.clear()
+
+                            numbers = random.sample(range(1,6), 4)
+                            numbers_str = [str(n) for n in numbers]
+
+                            start_x = 300
+                            number_positions.clear()
+
+                            for i, num in enumerate(numbers_str):
+                                number_positions[num] = (start_x + i * 200, 350)
+
+                            update_correct_sequence()
                 else:
                     selected_sequence.clear()
                     feedback = "wrong"
@@ -206,14 +244,36 @@ while cap.isOpened():
     # Completed
     # ==============================
     if not lesson.lesson_finished():
+
+        q = lesson.get_current_question()
+        current, total = lesson.get_progress()
+
+        if current == 0:
+            level = "EASY"
+        elif current == 1:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
         frame = draw_text(
             frame,
-            "Select numbers from SMALLEST to LARGEST",
-            (40, 30),
-            36,
-            (255,255,255),
-            "Orbitron-Bold.ttf"
+            f"LEVEL: {level}",
+            (980, 30),
+            28,
+            (0,255,255),
+            "Montserrat-SemiBold.ttf"
         )
+
+        if q is not None:
+            frame = draw_text(
+                frame,
+                q["question"],
+                (40, 30),
+                36,
+                (255,255,255),
+                "Orbitron-Bold.ttf"
+            )
+
     else:
         frame = draw_text(
             frame,

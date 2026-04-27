@@ -18,7 +18,8 @@ vosk_model = Model(MODEL_PATH)
 voice_commands = """
 [
 "clear","red","blue","green",
-"erase","draw"
+"erase","draw","stop",
+"undo","bigger","smaller"
 ]
 """
 
@@ -114,11 +115,9 @@ def run():
 
     prev_x, prev_y = 0, 0
     dwell_start = None
-    DWELL_TIME = 1.0
+    DWELL_TIME = 1.5
     drawing = False
-
-    alpha = 0.30  # smoother
-
+    alpha = 0.45
     window_name = "Accessibility Mode"
 
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -161,7 +160,17 @@ def run():
                             strokes.clear()
 
                         elif "draw" in command:
-                            ERASE_MODE = False
+                            drawing = True
+
+                        elif "stop" in command:
+                            drawing = False
+                            if len(current_stroke) > 2:
+                                strokes.append({
+                                    "points": current_stroke.copy(),
+                                    "color": current_color,
+                                    "thickness": thickness
+                                })
+                            current_stroke.clear()
 
                         elif "bigger" in command:
                             thickness = min(thickness + 1, 15)
@@ -194,10 +203,12 @@ def run():
                 # ======================
                 # FULL FACE CENTER (ULTRA STABLE)
                 # ======================
-                landmarks = np.array([(lm.x, lm.y) for lm in face.landmark])
-                center_x, center_y = landmarks.mean(axis=0)
+                nose = face.landmark[1]
+                center_x, center_y = nose.x, nose.y
 
-                scale = 1.5
+                landmarks = np.array([(lm.x, lm.y) for lm in face.landmark])
+
+                scale = 1.15
 
                 raw_x = int((center_x - 0.5) * scale * w + w / 2)
                 raw_y = int((center_y - 0.5) * scale * h + h / 2)
@@ -232,13 +243,13 @@ def run():
                 cy = int(alpha * raw_y + (1 - alpha) * prev_y)
 
                 # DEAD ZONE
-                if abs(cx - prev_x) < 5:
+                if abs(cx - prev_x) < 3:
                     cx = prev_x
-                if abs(cy - prev_y) < 5:
+                if abs(cy - prev_y) < 3:
                     cy = prev_y
 
                 # LIMIT SPEED
-                max_step = 80
+                max_step = 120
                 dx = cx - prev_x
                 dy = cy - prev_y
                 dx = max(-max_step, min(max_step, dx))
@@ -247,31 +258,47 @@ def run():
                 cy = prev_y + dy
 
                 # ======================
-                # DWELL DETECTION
+                # DWELL START DRAW
                 # ======================
-                if abs(cx - prev_x) < 10 and abs(cy - prev_y) < 10:
-                    if dwell_start is None:
-                        dwell_start = time.time()
+                move_x = abs(cx - prev_x)
+                move_y = abs(cy - prev_y)
+
+                if not drawing:
+                    if move_x < 10 and move_y < 12:
+
+                        if dwell_start is None:
+                            dwell_start = time.time()
+
+                        else:
+                            elapsed = time.time() - dwell_start
+
+                            progress = int((elapsed / DWELL_TIME) * 360)
+
+                            cv2.circle(frame, (cx, cy), 20, (80,80,80), 1)
+
+                            cv2.ellipse(
+                                frame,
+                                (cx, cy),
+                                (20,20),
+                                -90,
+                                0,
+                                progress,
+                                (0,255,255),
+                                3
+                            )
+
+                            if elapsed >= DWELL_TIME:
+                                drawing = True
+                                dwell_start = None
+
                     else:
-                        elapsed = time.time() - dwell_start
-
-                        # Draw progress circle
-                        progress = int((elapsed / DWELL_TIME) * 360)
-                        # Background circle
-                        cv2.circle(frame, (cx, cy), 20, (80, 80, 80), 1)
-
-                        # Progress arc (starts from top)
-                        cv2.ellipse(frame, (cx, cy), (20, 20),
-                                    -90, 0, progress, (0, 255, 255), 3)
-
-                        if elapsed > DWELL_TIME:
-                            drawing = True
-                            status_text = "Drawing..."
+                        dwell_start = None
                 else:
                     dwell_start = None
-                    drawing = False
 
                 prev_x, prev_y = cx, cy
+
+                status_text = "DRAWING..." if drawing else "HOLD TO START"
 
                 # Draw cursor
                 cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 2)
@@ -285,7 +312,9 @@ def run():
                         prev_pt = current_stroke[-1]
 
                         # interpolate points between previous and current
-                        steps = 5
+                        dist = int(np.hypot(cx - prev_pt[0], cy - prev_pt[1]))
+                        steps = max(5, dist // 8)
+
                         for i in range(1, steps + 1):
                             ix = int(prev_pt[0] + (cx - prev_pt[0]) * i / steps)
                             iy = int(prev_pt[1] + (cy - prev_pt[1]) * i / steps)

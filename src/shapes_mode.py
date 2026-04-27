@@ -26,7 +26,7 @@ active_gesture = "none"
 gesture_memory = "none"
 gesture_hold_frames = 0
 
-GESTURE_STABILITY = 3
+GESTURE_STABILITY = 2
 
 last_ix, last_iy = 640, 360
 
@@ -326,16 +326,27 @@ def get_perfect_shape(points):
     if dist_start_end < 70:
         cnt = np.array(points).reshape((-1, 1, 2)).astype(np.int32)
         peri = cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
+        area = cv2.contourArea(cnt)
+        circularity = 0
+        if peri > 0:
+            circularity = (4 * np.pi * area) / (peri * peri)
 
-        if len(approx) == 3:
+        approx = cv2.approxPolyDP(cnt, 0.03 * peri, True)
+
+        # CIRCLE FIRST (strict)
+        if circularity >= 0.76:
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            return Circle((int(x), int(y)), int(r))
+
+        # TRIANGLE
+        elif len(approx) == 3:
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 3)
             return Polygon(pts, "triangle")
-        
+
+        # 4 SIDES
         elif len(approx) == 4:
             x, y, w, h = cv2.boundingRect(cnt)
-
             aspect_ratio = w / float(h)
 
             pts = np.array([
@@ -345,34 +356,29 @@ def get_perfect_shape(points):
                 [x, y+h]
             ])
 
-            if 0.8 <= aspect_ratio <= 1.5:
+            if 0.88 <= aspect_ratio <= 1.12:
                 return Polygon(pts, "square")
             else:
                 return Polygon(pts, "rectangle")
-        
+
+        # PENTAGON
         elif len(approx) == 5:
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 5)
             return Polygon(pts, "pentagon")
-        
+
+        # HEXAGON
         elif len(approx) == 6:
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 6)
             return Polygon(pts, "hexagon")
 
-        elif len(approx) >= 8:
+        elif len(approx) >= 8 and circularity < 0.72:
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_star((x, y), r)
             return Polygon(pts, "star")
-  
-        else:
-            area = cv2.contourArea(cnt)
-            if peri > 0:
-                circularity = (4 * np.pi * area) / (peri * peri)
-                if circularity > 0.6:
-                    (x, y), r = cv2.minEnclosingCircle(cnt)
-                    return Circle((int(x), int(y)), int(r))
-    return None
+
+        return None
 
 def save_session(session_name=None):
     global current_session_file

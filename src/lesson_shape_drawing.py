@@ -11,9 +11,22 @@ FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 # LESSON QUESTIONS
 # ==============================
 questions = [
-    {"question": "Draw a CIRCLE", "answer": "circle"},
-    {"question": "Draw a SQUARE", "answer": "square"},
-    {"question": "Draw a TRIANGLE", "answer": "triangle"}
+
+    # EASY
+    {"question": "EASY 1: Draw a CIRCLE", "answer": "circle"},
+    {"question": "EASY 2: Draw a TRIANGLE", "answer": "triangle"},
+    {"question": "EASY 3: Draw a SQUARE", "answer": "square"},
+    {"question": "EASY 4: Draw another CIRCLE", "answer": "circle"},
+
+    # MEDIUM
+    {"question": "MEDIUM 1: Draw a RECTANGLE", "answer": "rectangle"},
+    {"question": "MEDIUM 2: Draw a PENTAGON", "answer": "pentagon"},
+    {"question": "MEDIUM 3: Draw a STAR", "answer": "star"},
+
+    # HARD
+    {"question": "HARD 1: Draw shape with 3 sides", "answer": "triangle"},
+    {"question": "HARD 2: Draw shape with 5 sides", "answer": "pentagon"},
+    {"question": "HARD 3: Draw reward shape", "answer": "star"},
 ]
 
 lesson = LessonEngine(questions)
@@ -149,7 +162,20 @@ while cap.isOpened():
                         detected_shape = "triangle"
 
                     elif sides == 4:
-                        detected_shape = "square"
+
+                        x,y,w,h = cv2.boundingRect(approx)
+                        ratio = w / float(h)
+
+                        if 0.85 <= ratio <= 1.15:
+                            detected_shape = "square"
+                        else:
+                            detected_shape = "rectangle"
+
+                    elif sides == 5:
+                        detected_shape = "pentagon"
+
+                    elif sides >= 8:
+                        detected_shape = "star"
 
                     else:
                         area = cv2.contourArea(cnt)
@@ -178,6 +204,15 @@ while cap.isOpened():
             continue
         
         current, total = lesson.get_progress()
+        if current <=4:
+            level = "EASY"
+        elif current <=7:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(frame, f"LEVEL: {level}", (1000,70), 28, (0,255,255))
+
         frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         frame = draw_text(
@@ -193,7 +228,7 @@ while cap.isOpened():
 
             frame = draw_text(
                 frame,
-                "Correct!",
+                "Great Job!",
                 (40, 80),
                 30,
                 (0,255,0),
@@ -204,7 +239,7 @@ while cap.isOpened():
 
             frame = draw_text(
                 frame,
-                "Try Again",
+                "Wrong Shape! Try Again",
                 (40, 80),
                 30,
                 (0,0,255),

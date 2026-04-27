@@ -2,337 +2,74 @@ import sys
 import os
 import subprocess
 import warnings
-import json
-import time
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QTextEdit, QHBoxLayout, QFrame, QGraphicsDropShadowEffect, QListWidget, 
-                             QMessageBox, QInputDialog, QProgressDialog, QProgressBar)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QEasingCurve, QTimer
-from PyQt6.QtGui import QFont, QColor, QFontDatabase
-
-class AnimatedButton(QPushButton):
-    def __init__(self, text, accent_color, parent=None):
-        super().__init__(text, parent)
-        self.accent_color_hex = accent_color
-        self.setFixedSize(480, 70) 
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.original_pos = None  
-
-        self.default_style = f"""
-            QPushButton {{
-                background-color: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-left: 4px solid {accent_color};
-                border-radius: 15px;
-                font-family: 'Montserrat';
-                font-size: 11pt;
-                font-weight: 600;
-                color: #ffffff;
-                text-align: center; letter-spacing: 2px;
-            }}
-        """
-        self.hover_style = f"""
-            QPushButton {{
-                background-color: {accent_color};
-                border: 1px solid {accent_color};
-                border-radius: 15px;
-                font-family: 'Montserrat';
-                font-size: 11pt;
-                font-weight: 800;
-                color: #000000;
-                text-align: center; letter-spacing: 2px;
-            }}
-        """
-        self.setStyleSheet(self.default_style)
-        
-        self.shadow = QGraphicsDropShadowEffect()
-        self.shadow.setBlurRadius(70)
-        self.shadow.setColor(QColor(0, 0, 0, 0)) 
-        self.shadow.setOffset(0, 0)
-        self.setGraphicsEffect(self.shadow)
-
-    def enterEvent(self, event):
-        if self.original_pos is None: 
-            self.original_pos = self.pos()
-            
-        self.setStyleSheet(self.hover_style)
-        
-        glow_color = QColor(self.accent_color_hex)
-        glow_color.setAlpha(150)
-        self.shadow.setColor(glow_color)
-        
-        self.anim = QPropertyAnimation(self, b"pos")
-        self.anim.setDuration(200)
-        self.anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-        self.anim.setEndValue(QPoint(self.original_pos.x(), self.original_pos.y() - 5))
-        self.anim.start()
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        self.setStyleSheet(self.default_style)
-        self.shadow.setColor(QColor(0, 0, 0, 0))
-        
-        self.anim = QPropertyAnimation(self, b"pos")
-        self.anim.setDuration(200)
-        self.anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-        if self.original_pos: 
-            self.anim.setEndValue(self.original_pos)
-        self.anim.start()
-        super().leaveEvent(event)
-
-def create_back_button(text="Back"):
-    btn = QPushButton(text)
-    btn.setFixedSize(220, 50)
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-
-    btn.setStyleSheet("""
-        QPushButton {
-            font-family: 'Montserrat';
-            font-size: 11pt;
-            font-weight: 600;
-
-            color: white;
-            background-color: rgba(255, 255, 255, 0.06);
-
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-        }
-
-        QPushButton:hover {
-            background-color: rgba(239, 68, 68, 0.25);
-            border: 1px solid #ef4444;
-        }
-
-        QPushButton:pressed {
-            background-color: rgba(239, 68, 68, 0.4);
-        }
-    """)
-
-    return btn
-
-class GuideWindow(QWidget):
-    def __init__(self, parent_menu):
-        super().__init__()
-        self.parent_menu = parent_menu
-        self.setWindowTitle("System Documentation")
-        self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
-
-        master_v = QVBoxLayout(self)
-        master_v.setContentsMargins(50, 50, 50, 50)
-        
-        hud_frame = QFrame()
-        hud_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 40px;
-            }
-        """)
-        
-        layout = QVBoxLayout(hud_frame)
-        layout.setContentsMargins(60, 60, 60, 60)
-
-        title = QLabel("SYSTEM DOCUMENTATION")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            color: #ffffff; 
-            font-size: 28pt; 
-            font-weight: 900; 
-            letter-spacing: 15px; 
-            border: none;
-            margin-bottom: 20px;
-        """)
-        layout.addWidget(title)
-
-        self.text_area = QTextEdit()
-        self.text_area.setReadOnly(True)
-        self.text_area.setHtml("""
-        <div style='color: rgba(255,255,255,0.85); font-size: 14pt; line-height: 180%;'>
-
-            <table width='100%' cellpadding='20'>
-                <tr>
-                    <!-- HAND ENGINE -->
-                    <td width='50%' valign='top' style='border-right: 1px solid rgba(255,255,255,0.1);'>
-                        
-                        <p align='center'>
-                            <b style='color:#6366f1; font-size: 20pt;'>✋ HAND ENGINE</b>
-                        </p>
-
-                        <p style='text-align: justify; margin-top: 20px;'>
-                            The Hand Engine enables real-time spatial interaction using advanced gesture recognition. 
-                            Users can directly manipulate digital objects in a natural and intuitive way, 
-                            eliminating the need for traditional input devices.
-                        </p>
-
-                        <ul style='margin-top: 20px;'>
-                            <li><b>✍️ DRAW MODE:</b> Create free-form strokes and geometric structures in real-time.</li>
-                            <li><b>🔄 ROTATION CONTROL:</b> Rotate objects dynamically through hand movement tracking.</li>
-                            <li><b>📏 SCALING:</b> Resize objects using pinch gestures with precision control.</li>
-                            <li><b>🧭 DEPTH ADJUSTMENT:</b> Modify object thickness and 3D depth interactively.</li>
-                            <li><b>✊ STATE CONTROL:</b> Lock or release objects using gesture-based commands.</li>
-                        </ul>
-
-                        <p style='margin-top: 25px; color: rgba(255,255,255,0.5);'>
-                            System intelligently detects the closest object relative to the user's index finger 
-                            for accurate selection and manipulation.
-                        </p>
-
-                    </td>
-
-                    <!-- VOICE ENGINE -->
-                    <td width='50%' valign='top'>
-                        
-                        <p align='center'>
-                            <b style='color:#06b6d4; font-size: 20pt;'>🎙️ VOICE ENGINE</b>
-                        </p>
-
-                        <p style='text-align: justify; margin-top: 20px;'>
-                            The Voice Engine provides hands-free control through real-time speech recognition. 
-                            It allows users to execute commands, manipulate objects, and control system behavior 
-                            using natural language interaction.
-                        </p>
-
-                        <div style='background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; margin-top: 20px;'>
-
-                            <p><b>🟦 SHAPE GENERATION</b><br>
-                            "Circle", "Square", "Triangle"</p>
-
-                            <p><b>🎨 VISUAL CONTROL</b><br>
-                            "Red", "Blue", "Green"</p>
-
-                            <p><b>📐 TRANSFORMATION</b><br>
-                            "Bigger", "Smaller", "Rotate"</p>
-
-                            <p><b>🧭 POSITIONING</b><br>
-                            "Up", "Down", "Left", "Right"</p>
-
-                            <p><b>🌐 MODE CONTROL</b><br>
-                            "Three D", "Two D"</p>
-
-                            <p><b>⚙️ SYSTEM COMMANDS</b><br>
-                            "Clear", "Reset", "Delete"</p>
-
-                        </div>
-
-                        <p style='margin-top: 25px; color: rgba(255,255,255,0.5);'>
-                            The system processes voice input locally, ensuring fast response time and offline capability.
-                        </p>
-
-                    </td>
-                </tr>
-            </table>
-
-            <hr style='margin-top: 40px; border: 1px solid rgba(255,255,255,0.1);'>
-
-            <!-- SYSTEM CAPABILITIES -->
-            <div style='margin-top: 30px; text-align: center;'>
-
-                <p style='font-size: 18pt; font-weight: bold; letter-spacing: 3px; color: #fbbf24;'>
-                    ⚡ SYSTEM CAPABILITIES
-                </p>
-
-                <p style='margin-top: 20px;'>
-                    • Real-time gesture tracking with spatial awareness<br>
-                    • Voice-controlled interaction without external devices<br>
-                    • Interactive 2D and 3D visualization environment<br>
-                    • Multi-module learning system (Geometry, Math, Science, Creative)<br>
-                    • Session saving and restoration for continuous learning
-                </p>
-
-            </div>
-
-        </div>
-        """)
-        self.text_area.setStyleSheet("background: transparent; border: none;")
-        self.text_area.setMinimumHeight(500)
-        layout.addWidget(self.text_area)
-
-        dismiss_btn = QPushButton("Back to Main Menu")
-        dismiss_btn.setFixedHeight(80)
-        dismiss_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        dismiss_btn.clicked.connect(self.close)
-        dismiss_btn.setStyleSheet("""
-            QPushButton {
-                font-family: 'Montserrat';
-                background: white; color: black; font-size: 14pt; font-weight: bold; 
-                border-radius: 20px; letter-spacing: 3px; margin-top: 20px;
-            }
-            QPushButton:hover { background: red; color: white; }
-        """)
-        layout.addWidget(dismiss_btn)
-
-        master_v.addWidget(hud_frame)
-
-    def closeEvent(self, event):
-        self.parent_menu.show_desktop()
-        event.accept()
-
-class LoadingScreen(QWidget):
-    def __init__(self, message="Loading..."):
-        super().__init__()
-
-        self.setWindowTitle("AirCanvas Loading")
-        self.showFullScreen()
-
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0a0a0f;
-            }
-        """)
-
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(12)
-
-        layout.addStretch()
-
-        title = QLabel("AIR CANVAS")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            font-family: 'Orbitron';
-            font-size: 72pt;
-            font-weight: 900;
-            color: white;
-            letter-spacing: -1px;
-        """)
-
-        msg = QLabel(message)
-        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setStyleSheet("""
-            font-family: 'Montserrat';
-            font-size: 16pt;
-            color: rgba(255,255,255,0.7);
-            margin-top: 10px;
-        """)
-
-        status = QLabel("Please wait...")
-        status.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        status.setStyleSheet("""
-            font-family: 'Montserrat';
-            font-size: 12pt;
-            color: rgba(255,255,255,0.4);
-            margin-top: 5px;
-        """)
-
-        layout.addWidget(title)
-        layout.addWidget(msg)
-        layout.addSpacing(10)
-        layout.addWidget(status)
-
-        layout.addStretch()
+from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QFrame,
+                             QProgressDialog)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontDatabase, QPixmap, QPainter, QColor
+from ui_components import AnimatedButton, create_back_button, LoadingScreen
+from extra_windows import GuideWindow, SessionManagerWindow
 
 class MainMenuGUI(QWidget):
+    def resizeEvent(self, event):
+        pixmap = QPixmap(os.path.join(
+            self.base_path,
+            "..",
+            "assets",
+            "background.jpg"
+        ))
+
+        scaled = pixmap.scaled(
+            self.width(),
+            self.height(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
+        # Darken image directly
+        dark_pixmap = QPixmap(scaled.size())
+        dark_pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(dark_pixmap)
+        painter.drawPixmap(0, 0, scaled)
+        painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 120))
+        painter.end()
+
+        self.bg_label.setPixmap(dark_pixmap)
+        self.bg_label.setGeometry(0, 0, self.width(), self.height())
+        self.bg_label.lower()
+
+        super().resizeEvent(event)
+
     def __init__(self):
         super().__init__()
+        self.setAutoFillBackground(True)
         self.setWindowTitle("AirCanvas Interface")
+        self.setStyleSheet("""
+            background-color: #0a0a0f;
+            font-family: 'Montserrat';
+        """)
+
         self.base_path = os.path.dirname(os.path.abspath(__file__))
+
         self.setStyleSheet("""
             QWidget {
-                background-color: #0a0a0f;
                 font-family: 'Montserrat';
             }
         """)
+
+        self.bg_label = QLabel(self)
+        self.bg_label.lower()
+
+        # self.overlay = QWidget(self)
+        # self.overlay.setGeometry(0, 0, 1920, 1080)
+        # self.overlay.setStyleSheet("""
+        #     background-color: rgba(0, 0, 0, 120);
+        # """)
+        # self.overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        
+        # self.bg_label.lower()
+        # self.overlay.raise_()
 
         FONT_DIR = os.path.join(self.base_path, "fonts")
         QFontDatabase.addApplicationFont(os.path.join(FONT_DIR, "Orbitron-Bold.ttf"))
@@ -345,6 +82,7 @@ class MainMenuGUI(QWidget):
         title_label = QLabel("AIR CANVAS")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("""
+            background: transparent;
             font-family: 'Orbitron';
             font-size: 80pt;
             font-weight: 900;
@@ -359,6 +97,7 @@ class MainMenuGUI(QWidget):
         subtitle = QLabel("SMART CLASSROOM ASSISTANT")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("""
+            background: transparent;
             font-family: 'Montserrat';
             font-size: 10pt;
             color: rgba(255,255,255,0.3);
@@ -376,12 +115,12 @@ class MainMenuGUI(QWidget):
         self.btn_container.setSpacing(15)
         self.btn_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.btn_hand = AnimatedButton("ACTIVATE HAND ENGINE", "#6366f1")
-        self.btn_voice = AnimatedButton("ACTIVATE VOICE ENGINE", "#06b6d4")
-        self.btn_accessibility = AnimatedButton("ACCESSIBILITY MODE", "#a855f7")
-        self.btn_lessons = AnimatedButton("LESSONS / ACTIVITY", "#fbbf24")
-        self.btn_guide = AnimatedButton("SYSTEM DOCUMENTATION", "#f43f5e")
-        self.btn_sessions = AnimatedButton("MANAGE SAVED SESSIONS", "#22c55e")
+        self.btn_hand = AnimatedButton("HAND TEACHING MODE", "#6366f1")
+        self.btn_voice = AnimatedButton("VOICE TEACHING MODE", "#06b6d4")
+        self.btn_accessibility = AnimatedButton("SMART ASSIST MODE", "#a855f7")
+        self.btn_lessons = AnimatedButton("LEARNING GAMES", "#fbbf24")
+        self.btn_guide = AnimatedButton("HELP / GUIDE", "#f43f5e")
+        self.btn_sessions = AnimatedButton("MY PROGRESS", "#22c55e")
 
         self.btn_hand.clicked.connect(self.start_hand_mode)
         self.btn_voice.clicked.connect(self.start_voice_mode)
@@ -408,6 +147,9 @@ class MainMenuGUI(QWidget):
         """)
         self.master_layout.addWidget(self.exit_btn, 0, Qt.AlignmentFlag.AlignCenter)
         self.master_layout.addSpacing(30)
+
+        self.bg_label.lower()
+        # self.overlay.lower()
 
     def show_desktop(self):
         self.showFullScreen()
@@ -478,14 +220,15 @@ class HandModuleWindow(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
 
-        title = QLabel("HAND ENGINE MODULES")
+        title = QLabel("HAND TEACHING TOOLS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(""" font-family: 'Orbitron'; color: white; font-size: 40pt; font-weight: 900; letter-spacing: 10px; """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
-        self.btn_shapes = AnimatedButton("SHAPES MODULE", "#6366f1")
-        self.btn_draw = AnimatedButton("FREE DRAW MODULE", "#06b6d4")
-        self.btn_solar = AnimatedButton("SOLAR SYSTEM MODULE", "#22c55e")
+        self.btn_shapes = AnimatedButton("SHAPES ADVENTURE", "#6366f1")
+        self.btn_draw = AnimatedButton("CREATIVE DRAWING BOARD", "#06b6d4")
+        self.btn_solar = AnimatedButton("SPACE EXPLORATION", "#22c55e")
 
         self.btn_shapes.clicked.connect(self.start_shapes_mode)
         self.btn_draw.clicked.connect(self.start_draw_mode)
@@ -513,9 +256,9 @@ class HandModuleWindow(QWidget):
             filename
         )
         messages = {
-            "shapes_mode.py": "Loading Shapes Engine...",
-            "draw_mode.py": "Loading Free Draw Canvas...",
-            "solar_mode.py": "Loading Solar System Simulation..."
+            "shapes_mode.py": "Entering Shape Adventure...",
+            "draw_mode.py": "Opening Creative Drawing Studio...",
+            "solar_mode.py": "Launching Space Adventure..."
         }
         message = messages.get(filename, "Loading Module...")
         if os.path.exists(script_path):
@@ -549,7 +292,7 @@ class VoiceModuleWindow(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
 
-        title = QLabel("VOICE ENGINE MODULES")
+        title = QLabel("VOICE TEACHING TOOLS")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             font-family: 'Orbitron';
@@ -559,11 +302,12 @@ class VoiceModuleWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
         # Buttons
-        self.btn_draw = AnimatedButton("VOICE DRAW MODULE", "#06b6d4")
-        self.btn_shapes = AnimatedButton("VOICE SHAPES MODULE", "#6366f1")
-        self.btn_solar = AnimatedButton("VOICE SOLAR MODULE", "#22c55e")
+        self.btn_draw = AnimatedButton("VOICE DRAWING BOARD", "#06b6d4")
+        self.btn_shapes = AnimatedButton("VOICE SHAPE ADVENTURE", "#6366f1")
+        self.btn_solar = AnimatedButton("VOICE SPACE EXPLORER", "#22c55e")
 
         self.btn_draw.clicked.connect(self.start_voice_draw)
         self.btn_shapes.clicked.connect(self.start_voice_shapes)
@@ -593,9 +337,9 @@ class VoiceModuleWindow(QWidget):
         )
 
         messages = {
-            "voice_draw.py": "Loading Voice Draw...",
-            "voice_shapes.py": "Loading Voice Shapes...",
-            "voice_solar.py": "Loading Voice Solar..."
+            "voice_draw.py": "Opening Voice Art Studio...",
+            "voice_shapes.py": "Starting Voice Shape Adventure...",
+            "voice_solar.py": "Launching Voice Space Explorer..."
         }
 
         message = messages.get(filename, "Loading Voice Module...")
@@ -623,294 +367,6 @@ class VoiceModuleWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
-class SessionManagerWindow(QWidget):
-    def __init__(self, parent_menu):
-        super().__init__()
-        self.parent_menu = parent_menu
-        self.setWindowTitle("Session Manager")
-        self.showFullScreen()
-        self.setStyleSheet("background-color: #030305; color: white;")
-
-        self.session_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions")
-        os.makedirs(self.session_folder, exist_ok=True)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(120, 60, 120, 60)
-        layout.setSpacing(30)
-
-        # Title
-        title = QLabel("SAVED SESSIONS")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            font-family: 'Orbitron';
-            font-size: 42pt;
-            font-weight: 900;
-            letter-spacing: 10px;
-            color: white;
-        """)
-        layout.addWidget(title)
-
-        # Card container
-        card = QFrame()
-        card.setStyleSheet("""
-            QFrame {
-                background: rgba(255,255,255,0.04);
-                border-radius: 25px;
-                border: 1px solid rgba(255,255,255,0.08);
-            }
-        """)
-
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(40, 40, 40, 40)
-        card_layout.setSpacing(25)
-
-        # Session list
-        self.session_list = QListWidget()
-        self.session_list.itemDoubleClicked.connect(self.load_session)
-        self.session_list.setMinimumHeight(350)
-
-        self.session_list.setStyleSheet("""
-            QListWidget {
-                background: rgba(255,255,255,0.03);
-                border: none;
-                border-radius: 15px;
-                font-size: 13pt;
-                padding: 12px;
-            }
-
-            QListWidget::item {
-                padding: 10px;
-                border-radius: 10px;
-            }
-
-            QListWidget::item:hover {
-                background: rgba(255,255,255,0.08);
-            }
-
-            QListWidget::item:selected {
-                background: #6366f1;
-                color: white;
-            }
-        """)
-
-        card_layout.addWidget(self.session_list)
-
-        row1 = QHBoxLayout()
-
-        self.btn_load = QPushButton("LOAD")
-        self.btn_rename = QPushButton("RENAME")
-        self.btn_delete = QPushButton("DELETE")
-
-        for btn in [self.btn_load, self.btn_rename, self.btn_delete]:
-            btn.setFixedHeight(45)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        row1.addWidget(self.btn_load)
-        row1.addWidget(self.btn_rename)
-        row1.addWidget(self.btn_delete)
-
-        card_layout.addLayout(row1)
-
-        row2 = QHBoxLayout()
-
-        self.btn_refresh = QPushButton("REFRESH")
-        self.btn_back = create_back_button("Back")
-
-        for btn in [self.btn_refresh, self.btn_back]:
-            btn.setFixedHeight(45)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        self.btn_load.clicked.connect(self.load_session)
-        self.btn_rename.clicked.connect(self.rename_session)
-        self.btn_delete.clicked.connect(self.delete_session)
-        self.btn_refresh.clicked.connect(self.refresh_sessions)
-        self.btn_back.clicked.connect(self.close)
-
-        self.btn_load.setStyleSheet("""
-        QPushButton {
-            font-family: "Montserrat";
-            background: #22c55e;
-            color: white;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: #16a34a;
-        }
-        """)
-
-        self.btn_rename.setStyleSheet("""
-        QPushButton {
-            font-family: "Montserrat";
-            background: #6366f1;
-            color: white;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: #4f46e5;
-        }
-        """)
-
-        self.btn_delete.setStyleSheet("""
-        QPushButton {
-            font-family: "Montserrat";
-            background: #ef4444;
-            color: white;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: #dc2626;
-        }
-        """)
-
-        self.btn_refresh.setStyleSheet("""
-        QPushButton {
-            font-family: "Montserrat";
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: rgba(255,255,255,0.2);
-        }
-        """)
-
-        self.btn_back.setStyleSheet("""
-        QPushButton {
-            font-family: "Montserrat";
-            background: white;
-            color: black;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background: #6366f1;
-            color: white;
-        }
-        """)
-
-        row2.addWidget(self.btn_refresh)
-        row2.addWidget(self.btn_back)
-
-        card_layout.addLayout(row2)
-
-        layout.addWidget(card)
-
-        self.refresh_sessions()
-
-    def refresh_sessions(self):
-        self.session_list.clear()
-
-        files = [f for f in os.listdir(self.session_folder) if f.endswith(".json")]
-        files.sort()
-
-        for f in files:
-            filepath = os.path.join(self.session_folder, f)
-
-            try:
-                with open(filepath, "r") as file:
-                    data = json.load(file)
-                    mode = data.get("mode", "unknown")
-            except:
-                mode = "unknown"
-
-            mode_label = mode.upper()
-
-            display_text = f"{f}   [{mode_label}]"
-
-            self.session_list.addItem(display_text)
-
-    def delete_session(self):
-        selected_item = self.session_list.currentItem()
-
-        if not selected_item:
-            return
-
-        filename = selected_item.text().split("   ")[0]
-        filepath = os.path.join(self.session_folder, filename)
-
-        reply = QMessageBox.question(
-            self,
-            "Delete Session",
-            f"Are you sure you want to delete:\n{filename}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-
-        self.refresh_sessions()
-
-    def rename_session(self):
-        selected_item = self.session_list.currentItem()
-
-        if not selected_item:
-            return
-
-        old_filename = selected_item.text().split("   ")[0]
-        old_path = os.path.join(self.session_folder, old_filename)
-
-        new_name, ok = QInputDialog.getText(self, "Rename Session", "Enter new session name:")
-
-        if ok and new_name:
-            new_filename = f"{new_name}.json"
-            new_path = os.path.join(self.session_folder, new_filename)
-
-            os.rename(old_path, new_path)
-            self.refresh_sessions()
-
-    def load_session(self):
-        selected_item = self.session_list.currentItem()
-
-        if not selected_item:
-            return
-
-        filename = selected_item.text().split("   ")[0]
-        filepath = os.path.join(self.session_folder, filename)
-
-        if not os.path.exists(filepath):
-            return
-
-        # read json
-        with open(filepath, "r") as f:
-            data = json.load(f)
-
-        mode = data.get("mode")
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-
-        if mode == "free_draw":
-            script = os.path.join(base_dir, "draw_mode.py")
-
-        elif mode == "shapes":
-            script = os.path.join(base_dir, "shapes_mode.py")
-
-        elif mode == "solar":
-            script = os.path.join(base_dir, "solar_mode.py")
-
-        else:
-            print("Unknown session mode")
-            return
-        
-        loading = LoadingScreen("Loading Saved Session...")
-        loading.show()
-        QApplication.processEvents()
-
-        self.hide()
-
-        subprocess.run([sys.executable, script, "--load", filename])
-
-        loading.close()
-
-        self.parent_menu.show_desktop()
-
-    def closeEvent(self, event):
-        self.parent_menu.show_desktop()
-        event.accept()
-
 class LessonMenuWindow(QWidget):
     def __init__(self, parent_menu):
         super().__init__()
@@ -923,7 +379,7 @@ class LessonMenuWindow(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
 
-        title = QLabel("LESSONS / ACTIVITY")
+        title = QLabel("GAMES / ACTIVITY")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             font-family: "Orbitron";                
@@ -933,11 +389,12 @@ class LessonMenuWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
-        self.btn_geo = AnimatedButton("GEOMETRY LESSONS", "#6366f1")
-        self.btn_math = AnimatedButton("MATHEMATICS LESSONS", "#06b6d4")
-        self.btn_sci = AnimatedButton("SCIENCE LESSONS", "#22c55e")
-        self.btn_creative = AnimatedButton("CREATIVE LESSONS", "#f59e0b")
+        self.btn_geo = AnimatedButton("SHAPE LEARNING", "#6366f1")
+        self.btn_math = AnimatedButton("NUMBER LEARNING", "#06b6d4")
+        self.btn_sci = AnimatedButton("PLANET LEARNING", "#22c55e")
+        self.btn_creative = AnimatedButton("CREATIVE LEARNING", "#f59e0b")
 
         self.btn_geo.clicked.connect(self.open_geometry)
         self.btn_math.clicked.connect(self.open_math)
@@ -989,7 +446,7 @@ class GeometryLessonWindow(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
 
-        title = QLabel("GEOMETRY LESSONS")
+        title = QLabel("SHAPE LEARNING")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             font-family: "Orbitron";
@@ -999,13 +456,14 @@ class GeometryLessonWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
         lessons = [
-            ("Shape Recognition", "lesson_shape_recognition.py"),
-            ("Shape Drawing", "lesson_shape_drawing.py"),
-            ("Shape Matching", "lesson_shape_matching.py"),
-            ("Shape Counting", "lesson_shape_counting.py"),
-            ("Shape Comparison", "lesson_shape_comparison.py"),
+            ("Find the Shape", "lesson_shape_recognition.py"),
+            ("Draw Shapes", "lesson_shape_drawing.py"),
+            ("Match Shapes", "lesson_shape_matching.py"),
+            ("Count Shapes", "lesson_shape_counting.py"),
+            ("Compare Shapes", "lesson_shape_comparison.py"),
         ]
 
         for name, file in lessons:
@@ -1078,13 +536,14 @@ class MathLessonWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
         lessons = [
-            ("Number Recognition", "lesson_mathematics_numrecognition.py"),
-            ("Counting Objects", "lesson_mathematics_countingobjects.py"),
-            ("Missing Number", "lesson_mathematics_missingnum.py"),
-            ("Basic Addition", "lesson_mathematics_basicadd.py"),
-            ("Number Ordering", "lesson_mathematics_numordering.py"),
+            ("Find the Number", "lesson_mathematics_numrecognition.py"),
+            ("Count Objects", "lesson_mathematics_countingobjects.py"),
+            ("Fill Missing Number", "lesson_mathematics_missingnum.py"),
+            ("Add Numbers", "lesson_mathematics_basicadd.py"),
+            ("Arrange Numbers", "lesson_mathematics_numordering.py"),
         ]
 
         for name, file in lessons:
@@ -1158,12 +617,13 @@ class ScienceLessonWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
         lessons = [
-            ("Planet Identification", "lesson_planet_identification.py"),
-            ("Planet Comparison", "lesson_planet_comparison.py"),
-            ("Planet Order", "lesson_planet_order.py"),
-            ("Planet Info", "lesson_planet_information.py"),
+            ("Find the Planet", "lesson_planet_identification.py"),
+            ("Compare Planets", "lesson_planet_comparison.py"),
+            ("Planet Order Game", "lesson_planet_order.py"),
+            ("Learn About Planets", "lesson_planet_information.py"),
         ]
 
         for name, file in lessons:
@@ -1237,11 +697,12 @@ class CreativeLessonWindow(QWidget):
             letter-spacing: 10px;
         """)
         layout.addWidget(title)
+        layout.addSpacing(20)
 
         lessons = [
             ("Free Drawing", "lesson_creative_freedrawing.py"),
-            ("Color Learning", "lesson_creative_colourlearning.py"),
-            ("Pattern Drawing", "lesson_creative_patterndrawing.py"),
+            ("Learn Colors", "lesson_creative_colourlearning.py"),
+            ("Draw Patterns", "lesson_creative_patterndrawing.py"),
         ]
 
         for name, file in lessons:

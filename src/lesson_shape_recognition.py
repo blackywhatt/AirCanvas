@@ -14,9 +14,22 @@ HOVER_THRESHOLD = 25
 # Lesson Questions
 # ==============================
 questions = [
+
+    # EASY
     {"question": "Select the CIRCLE", "answer": "circle"},
-    {"question": "Select the SQUARE", "answer": "square"},
-    {"question": "Select the TRIANGLE", "answer": "triangle"}
+    {"question": "Select the RECTANGLE", "answer": "rectangle"},
+    {"question": "Select the STAR", "answer": "star"},
+    {"question": "Select the TRIANGLE", "answer": "triangle"},
+
+    # MEDIUM
+    {"question": "Select the shape with 4 equal sides", "answer": "square"},
+    {"question": "Select the shape with 5 sides", "answer": "pentagon"},
+    {"question": "Select the only curved shape", "answer": "circle"},
+
+    # HARD
+    {"question": "Select the shape used in flags and rewards", "answer": "star"},
+    {"question": "Select the wider version of square", "answer": "rectangle"},
+    {"question": "Select the 3-corner shape", "answer": "triangle"},
 ]
 
 lesson = LessonEngine(questions)
@@ -25,9 +38,13 @@ lesson = LessonEngine(questions)
 # Shape Positions
 # ==============================
 shape_positions = {
-    "circle": (320, 360),
-    "square": (640, 360),
-    "triangle": (960, 360)
+    "circle": (220, 250),
+    "square": (500, 250),
+    "triangle": (780, 250),
+
+    "rectangle": (1060, 250),
+    "pentagon": (380, 520),
+    "star": (860, 520)
 }
 
 # ==============================
@@ -76,7 +93,7 @@ def detect_selected_shape(ix,iy):
 
         dist = np.hypot(ix-sx,iy-sy)
 
-        if dist < 100:
+        if dist < 120:
             return shape
 
     return None
@@ -115,6 +132,40 @@ while cap.isOpened():
     x,y = shape_positions["triangle"]
     pts = np.array([[x,y-70],[x-60,y+60],[x+60,y+60]],np.int32)
     cv2.polylines(frame,[pts],True,triangle_color,3)
+
+    # Rectangle
+    rect_color = (0,255,255) if hover_shape == "rectangle" else (255,255,255)
+    x,y = shape_positions["rectangle"]
+    cv2.rectangle(frame,(x-80,y-50),(x+80,y+50),rect_color,3)
+
+    # Pentagon
+    pen_color = (0,255,255) if hover_shape == "pentagon" else (255,255,255)
+    x,y = shape_positions["pentagon"]
+    pts = np.array([
+        [x, y-70],
+        [x-65, y-20],
+        [x-40, y+60],
+        [x+40, y+60],
+        [x+65, y-20]
+    ], np.int32)
+    cv2.polylines(frame,[pts],True,pen_color,3)
+
+    # Star
+    star_color = (0,255,255) if hover_shape == "star" else (255,255,255)
+    x,y = shape_positions["star"]
+    pts = np.array([
+        [x, y-70],
+        [x-20, y-20],
+        [x-70, y-20],
+        [x-30, y+10],
+        [x-45, y+65],
+        [x, y+30],
+        [x+45, y+65],
+        [x+30, y+10],
+        [x+70, y-20],
+        [x+20, y-20]
+    ], np.int32)
+    cv2.polylines(frame,[pts],True,star_color,3)
 
     # ==============================
     # LESSON RUNNING
@@ -160,6 +211,16 @@ while cap.isOpened():
                     hover_frames = 0
                     hover_shape = None
 
+        
+        if current <=4:
+            level = "EASY"
+        elif current <=7:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(frame, f"LEVEL: {level}", (1000,70), 28, (0,255,255))
+        
         # Feedback
         if lesson.feedback == "correct":
 

@@ -31,9 +31,16 @@ with open(SCALER_PATH, "rb") as f:
     scaler = pickle.load(f)
 
 frame_counter = 0
-PREDICT_EVERY_N_FRAMES = 3
-last_gesture = "idle"
+PREDICT_EVERY_N_FRAMES = 2
 
+last_gesture = "idle"
+lost_hand_frames = 0
+HOLD_LAST_GESTURE = 4
+
+two_hand_frames = 0
+TWO_HAND_STABLE = 1
+
+CONFIDENCE_THRESHOLD = 0.70
 # ==============================
 # MediaPipe Setup
 # ==============================
@@ -43,7 +50,7 @@ mp_draw = mp.solutions.drawing_utils
 hands = mp_hands.Hands(
     max_num_hands=2,  # supports 2 hands
     model_complexity=1,
-    min_detection_confidence=0.6,
+    min_detection_confidence=0.5,
     min_tracking_confidence=0.4
 )
 
@@ -51,7 +58,7 @@ hands = mp_hands.Hands(
 # Gesture Detection Function
 # ==============================
 def get_gesture(frame):
-    global frame_counter, last_gesture
+    global frame_counter, last_gesture, two_hand_frames, lost_hand_frames
 
     h, w, _ = frame.shape
     gesture_label = "idle"
@@ -67,6 +74,7 @@ def get_gesture(frame):
     rgb_frame.flags.writeable = True
 
     if result.multi_hand_landmarks:
+        lost_hand_frames = 0
         hand_count = len(result.multi_hand_landmarks)
 
         for hl in result.multi_hand_landmarks:
@@ -96,6 +104,7 @@ def get_gesture(frame):
         # ML Classification ONLY if 1 hand
         # ==============================
         if hand_count == 1:
+            two_hand_frames = 0
             hl = result.multi_hand_landmarks[0]
             base_x = hl.landmark[0].x
             base_y = hl.landmark[0].y
@@ -110,15 +119,32 @@ def get_gesture(frame):
 
             if frame_counter % PREDICT_EVERY_N_FRAMES == 0:
                 try:
-                    pred = model.predict(lm_input, verbose=0)
-                    last_gesture = label_map[np.argmax(pred)]
+                    pred = model.predict(lm_input, verbose=0)[0]
+
+                    best_idx = np.argmax(pred)
+                    best_score = pred[best_idx]
+
+                    if best_score >= CONFIDENCE_THRESHOLD:
+                        last_gesture = label_map[best_idx]
                 except:
-                    last_gesture = "idle"
+                    pass
 
             gesture_label = last_gesture
 
         else:
-            # If 2 hands → depth mode (no ML)
-            gesture_label = "two_hands"
+            two_hand_frames += 1
+
+            if two_hand_frames >= TWO_HAND_STABLE:
+                gesture_label = "two_hands"
+            else:
+                gesture_label = last_gesture
+
+    else:
+        lost_hand_frames += 1
+
+        if lost_hand_frames <= HOLD_LAST_GESTURE:
+            gesture_label = last_gesture
+        else:
+            gesture_label = "idle"
 
     return gesture_label, index_positions, thumb_positions, hand_count, frame

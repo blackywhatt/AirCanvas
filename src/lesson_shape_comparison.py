@@ -10,8 +10,22 @@ FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 # QUESTIONS
 # ==============================
 questions = [
-    {"question":"Which has MORE SIDES?", "type":"sides"},
-    {"question":"Which has LESS SIDES?", "type":"less"}
+
+    # EASY
+    {"question":"Which has MORE SIDES?", "type":"more"},
+    {"question":"Which has LESS SIDES?", "type":"less"},
+    {"question":"Which has MORE SIDES?", "type":"more"},
+    {"question":"Which has LESS SIDES?", "type":"less"},
+
+    # MEDIUM
+    {"question":"Which has MORE CORNERS?", "type":"corners"},
+    {"question":"Which is ROUND?", "type":"round"},
+    {"question":"Which has 4 SIDES?", "type":"four"},
+
+    # HARD
+    {"question":"Which has 5 SIDES?", "type":"five"},
+    {"question":"Which is a STAR?", "type":"points"},
+    {"question":"Which has the MOST EDGES?", "type":"more"}
 ]
 
 lesson = LessonEngine(questions)
@@ -22,7 +36,10 @@ lesson = LessonEngine(questions)
 shape_sides = {
     "triangle":3,
     "square":4,
-    "circle":0   
+    "rectangle":4,
+    "pentagon":5,
+    "star":10,
+    "circle":0
 }
 
 shape_positions = {
@@ -57,20 +74,69 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
 # ==============================
 # GENERATE QUESTION
 # ==============================
-def generate_pair():
+def generate_pair(qtype):
 
-    shapes = ["triangle","square","circle"]
+    all_shapes = [
+        "triangle",
+        "square",
+        "rectangle",
+        "pentagon",
+        "star",
+        "circle"
+    ]
 
-    s1 = random.choice(shapes)
-    s2 = random.choice(shapes)
+    # EASY / comparison questions
+    if qtype in ["more", "less", "corners"]:
+        s1 = random.choice(all_shapes)
+        s2 = random.choice(all_shapes)
 
-    while s1 == s2:
-        s2 = random.choice(shapes)
+        while s1 == s2 or shape_sides[s1] == shape_sides[s2]:
+            s2 = random.choice(all_shapes)
 
-    return s1,s2
+        return s1, s2
 
-left_shape, right_shape = generate_pair()
+    # ROUND question
+    elif qtype == "round":
+        correct_side = random.choice(["left","right"])
+        wrong = random.choice(["triangle","square","rectangle","pentagon","star"])
 
+        if correct_side == "left":
+            return "circle", wrong
+        else:
+            return wrong, "circle"
+
+    # FOUR SIDES
+    elif qtype == "four":
+        correct = random.choice(["square","rectangle"])
+        wrong = random.choice(["triangle","circle","pentagon","star"])
+
+        if random.choice([True,False]):
+            return correct, wrong
+        else:
+            return wrong, correct
+
+    # FIVE SIDES
+    elif qtype == "five":
+        wrong = random.choice(["triangle","square","rectangle","circle","star"])
+
+        if random.choice([True,False]):
+            return "pentagon", wrong
+        else:
+            return wrong, "pentagon"
+
+    # STAR question
+    elif qtype == "points":
+        wrong = random.choice(["circle","square","rectangle"])
+
+        if random.choice([True,False]):
+            return "star", wrong
+        else:
+            return wrong, "star"
+
+    return "triangle", "square"
+
+q = lesson.get_current_question()
+left_shape, right_shape = generate_pair(q["type"])
 # ==============================
 # DRAW SHAPE
 # ==============================
@@ -86,6 +152,34 @@ def draw_shape(frame,shape,pos):
 
     elif shape == "triangle":
         pts = np.array([[x,y-80],[x-70,y+70],[x+70,y+70]],np.int32)
+        cv2.polylines(frame,[pts],True,(255,255,255),3)
+
+    elif shape == "rectangle":
+        cv2.rectangle(frame,(x-90,y-60),(x+90,y+60),(255,255,255),3)
+
+    elif shape == "pentagon":
+        pts = np.array([
+            [x,y-80],
+            [x-70,y-20],
+            [x-45,y+70],
+            [x+45,y+70],
+            [x+70,y-20]
+        ], np.int32)
+        cv2.polylines(frame,[pts],True,(255,255,255),3)
+
+    elif shape == "star":
+        pts = np.array([
+            [x,y-80],
+            [x-25,y-20],
+            [x-80,y-20],
+            [x-35,y+10],
+            [x-50,y+75],
+            [x,y+35],
+            [x+50,y+75],
+            [x+35,y+10],
+            [x+80,y-20],
+            [x+25,y-20]
+        ], np.int32)
         cv2.polylines(frame,[pts],True,(255,255,255),3)
 
 # ==============================
@@ -162,11 +256,26 @@ while cap.isOpened():
             # ==============================
             # DETERMINE CORRECT
             # ==============================
-            if q["type"] == "sides":
+            if q["type"] == "more":
                 correct = "left" if left_sides > right_sides else "right"
 
-            else:  # less
+            elif q["type"] == "less":
                 correct = "left" if left_sides < right_sides else "right"
+
+            elif q["type"] == "corners":
+                correct = "left" if left_sides > right_sides else "right"
+
+            elif q["type"] == "round":
+                correct = "left" if left_shape == "circle" else "right"
+
+            elif q["type"] == "four":
+                correct = "left" if left_shape in ["square","rectangle"] else "right"
+
+            elif q["type"] == "five":
+                correct = "left" if left_shape == "pentagon" else "right"
+
+            elif q["type"] == "points":
+                correct = "left" if left_shape == "star" else "right"
 
             # inject answer
             q["answer"] = correct
@@ -174,7 +283,8 @@ while cap.isOpened():
             lesson.check_answer(selected)
 
             if not lesson.lesson_finished():
-                left_shape, right_shape = generate_pair()
+                q = lesson.get_current_question()
+                left_shape, right_shape = generate_pair(q["type"])
 
             answer_cooldown = 30
 
@@ -185,6 +295,14 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
         current, total = lesson.get_progress()
+        if current <=4:
+            level = "EASY"
+        elif current <=7:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(frame, f"LEVEL: {level}", (980,70), 28, (0,255,255))
         frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
 
         frame = draw_text(

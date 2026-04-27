@@ -14,17 +14,24 @@ HOVER_THRESHOLD = 25
 # ==============================
 # Generate Questions
 # ==============================
-questions = []
+questions = [
 
-for _ in range(5):
-    total = random.randint(2, 6)
-    first = random.randint(1, total - 1)
-    missing = total - first
+    # EASY
+    {"question":"1 + _ = 3", "answer":"2"},
+    {"question":"_ + 1 = 2", "answer":"1"},
+    {"question":"_ + 2 = 4", "answer":"2"},
+    {"question":"1 + _ = 5", "answer":"4"},
 
-    questions.append({
-        "question": f"{first} + _ = {total}",
-        "answer": str(missing)
-    })
+    # MEDIUM
+    {"question":"2 + _ + 2 = 9", "answer":"5"},
+    {"question":"_ + 1 + 3 = 8", "answer":"4"},
+    {"question":"2 + 3 + _ = 10", "answer":"5"},
+
+    # HARD
+    {"question":"_ + 3 - 2 = 7", "answer":"6"},
+    {"question":"7 - _ + 8 = 9", "answer":"6"},
+    {"question":"_ - 5 + 4 = 6", "answer":"7"}
+]
 
 lesson = LessonEngine(questions)
 
@@ -32,11 +39,13 @@ lesson = LessonEngine(questions)
 # Number Positions
 # ==============================
 number_positions = {
-    "1": (300, 500),
-    "2": (500, 500),
-    "3": (700, 500),
-    "4": (900, 500),
-    "5": (1100, 500)
+    "1": (120,500),
+    "2": (280,500),
+    "3": (440,500),
+    "4": (600,500),
+    "5": (760,500),
+    "6": (920,500),
+    "7": (1080,500)
 }
 
 # ==============================
@@ -117,6 +126,22 @@ while cap.isOpened():
         
         current, total = lesson.get_progress()
         frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
+
+        if current <= 3:
+            level = "EASY"
+        elif current <= 6:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(
+            frame,
+            f"LEVEL: {level}",
+            (980,70),
+            28,
+            (0,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
         # Draw equation BIG (center)
         frame = draw_text(

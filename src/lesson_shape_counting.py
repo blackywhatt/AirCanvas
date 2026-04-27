@@ -53,9 +53,22 @@ def draw_text(frame, text, position, font, color=(30,30,30), center=False):
 # ==============================
 
 questions = [
+
+    # EASY
     {"question": "How many TRIANGLES?", "shape": "triangle"},
+    {"question": "How many CIRCLES?", "shape": "circle"},
     {"question": "How many SQUARES?", "shape": "square"},
-    {"question": "How many CIRCLES?", "shape": "circle"}
+    {"question": "How many RECTANGLES?", "shape": "rectangle"},
+
+    # MEDIUM
+    {"question": "How many PENTAGONS?", "shape": "pentagon"},
+    {"question": "How many STARS?", "shape": "star"},
+    {"question": "How many TRIANGLES?", "shape": "triangle"},
+
+    # HARD
+    {"question": "How many SHAPES have 4 sides?", "shape": "fourside"},
+    {"question": "How many SHAPES have corners?", "shape": "corners"},
+    {"question": "How many ROUND shapes?", "shape": "round"}
 ]
 
 lesson = LessonEngine(questions)
@@ -63,7 +76,7 @@ lesson = LessonEngine(questions)
 # ==============================
 # NUMBER POSITIONS
 # ==============================
-numbers = [1,2,3,4,5]
+numbers = [1,2,3,4,5,6]
 
 start_x = CENTER_X - (len(numbers)//2) * ANSWER_SPACING
 
@@ -80,34 +93,77 @@ def generate_shapes(target_shape):
     shapes = []
     positions = []
 
-    num_shapes = random.randint(3,5)
+    num_shapes = random.randint(4,6)
 
-    # ✅ Force at least one correct shape
-    x = random.randint(SHAPE_X_MIN, SHAPE_X_MAX)
-    y = random.randint(SHAPE_Y_MIN, SHAPE_Y_MAX)
-    shapes.append((target_shape,(x,y)))
-    positions.append((x,y))
+    # -------------------------
+    # Decide correct count
+    # -------------------------
+    if target_shape in ["corners", "fourside"]:
+        target_count = random.randint(2,5)
+    elif target_shape == "round":
+        target_count = random.randint(1,4)
+    else:
+        target_count = random.randint(1, min(4, num_shapes))
 
+    # -------------------------
+    # helper add shape
+    # -------------------------
+    def add_shape(shape_name):
+        tries = 0
+        while tries < 100:
+            x = random.randint(SHAPE_X_MIN, SHAPE_X_MAX)
+            y = random.randint(SHAPE_Y_MIN, SHAPE_Y_MAX)
+
+            valid = True
+            for px, py in positions:
+                if np.hypot(x-px, y-py) < 120:
+                    valid = False
+                    break
+
+            if valid:
+                shapes.append((shape_name, (x,y)))
+                positions.append((x,y))
+                return
+
+            tries += 1
+
+    # -------------------------
+    # Add correct shapes
+    # -------------------------
+    for _ in range(target_count):
+
+        if target_shape == "corners":
+            add_shape(random.choice([
+                "triangle","square","rectangle","pentagon","star"
+            ]))
+
+        elif target_shape == "fourside":
+            add_shape(random.choice(["square","rectangle"]))
+
+        elif target_shape == "round":
+            add_shape("circle")
+
+        else:
+            add_shape(target_shape)
+
+    # -------------------------
+    # Fill remaining wrong shapes
+    # -------------------------
     while len(shapes) < num_shapes:
 
-        shape = random.choice(["circle","square","triangle"])
+        wrong_pool = [
+            "circle","square","triangle",
+            "rectangle","pentagon","star"
+        ]
 
-        x = random.randint(SHAPE_X_MIN, SHAPE_X_MAX)
-        y = random.randint(SHAPE_Y_MIN, SHAPE_Y_MAX)
+        shape = random.choice(wrong_pool)
 
-        valid = True
-        for px,py in positions:
-            if np.hypot(x-px,y-py) < 120:
-                valid = False
-                break
-
-        if valid:
-            shapes.append((shape,(x,y)))
-            positions.append((x,y))
+        add_shape(shape)
 
     return shapes
 
 q = lesson.get_current_question()
+
 if q is not None:
     shapes = generate_shapes(q["shape"])
 else:
@@ -132,6 +188,34 @@ def draw_shape(frame,shape,pos):
             [x, y-SHAPE_SIZE-10],
             [x-SHAPE_SIZE, y+SHAPE_SIZE],
             [x+SHAPE_SIZE, y+SHAPE_SIZE]
+        ], np.int32)
+        cv2.polylines(frame,[pts],True,(255,255,255),3)
+
+    elif shape == "rectangle":
+        cv2.rectangle(frame,(x-55,y-35),(x+55,y+35),(255,255,255),3)
+
+    elif shape == "pentagon":
+        pts = np.array([
+            [x, y-45],
+            [x-40, y-10],
+            [x-25, y+40],
+            [x+25, y+40],
+            [x+40, y-10]
+        ], np.int32)
+        cv2.polylines(frame,[pts],True,(255,255,255),3)
+
+    elif shape == "star":
+        pts = np.array([
+            [x, y-45],
+            [x-15, y-10],
+            [x-45, y-10],
+            [x-20, y+10],
+            [x-30, y+40],
+            [x, y+20],
+            [x+30, y+40],
+            [x+20, y+10],
+            [x+45, y-10],
+            [x+15, y-10]
         ], np.int32)
         cv2.polylines(frame,[pts],True,(255,255,255),3)
 
@@ -209,7 +293,17 @@ while cap.isOpened():
 
             q = lesson.get_current_question()
 
-            count = sum(1 for s in shapes if s[0] == q["shape"])
+            if q["shape"] == "fourside":
+                count = sum(1 for s in shapes if s[0] in ["square","rectangle"])
+
+            elif q["shape"] == "corners":
+                count = sum(1 for s in shapes if s[0] != "circle")
+
+            elif q["shape"] == "round":
+                count = sum(1 for s in shapes if s[0] == "circle")
+
+            else:
+                count = sum(1 for s in shapes if s[0] == q["shape"])
 
             q["answer"] = count
 
@@ -230,6 +324,15 @@ while cap.isOpened():
         q = lesson.get_current_question()
         current, total = lesson.get_progress()
         frame = draw_text(frame, f"{current}/{total}", (1100,30), font_small)   
+
+        if current <=4:
+            level = "EASY"
+        elif current <=7:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(frame, f"LEVEL: {level}", (1000,70), font_small)
 
         frame = draw_text(frame, q["question"], QUESTION_POS, font_question, center=True)
 

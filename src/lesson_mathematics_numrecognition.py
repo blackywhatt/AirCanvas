@@ -14,24 +14,51 @@ HOVER_THRESHOLD = 25
 # Lesson Questions
 # ==============================
 questions = [
+
+    # EASY
     {"question": "Select number ONE", "answer": "1"},
-    {"question": "Select number TWO", "answer": "2"},
     {"question": "Select number THREE", "answer": "3"},
-    {"question": "Select number FOUR", "answer": "4"}
+    {"question": "Select number TWO", "answer": "2"},
+    {"question": "Select number FOUR", "answer": "4"},
+
+    # MEDIUM
+    {"question": "Select the BIGGEST number", "answer": "4"},
+    {"question": "Select the SMALLEST number", "answer": "1"},
+    {"question": "Select an EVEN number", "answer": "2"},
+
+    # HARD
+    {"question": "What is ONE + TWO ?", "answer": "3"},
+    {"question": "What is TWO + TWO ?", "answer": "4"},
+    {"question": "What is THREE - TWO ?", "answer": "1"}
 ]
 
 lesson = LessonEngine(questions)
-
 # ==============================
 # Number Positions
 # ==============================
-number_positions = {
-    "1": (250, 360),
-    "2": (500, 360),
-    "3": (750, 360),
-    "4": (1000, 360)
-}
+base_positions = [
+    (250, 360),
+    (500, 360),
+    (750, 360),
+    (1000, 360)
+]
 
+number_positions = {}
+
+def shuffle_numbers():
+
+    global number_positions
+    import random
+
+    nums = ["1","2","3","4"]
+    random_positions = base_positions.copy()
+    random.shuffle(random_positions)
+
+    number_positions = {
+        nums[i]: random_positions[i]
+        for i in range(4)
+    }
+shuffle_numbers()
 # ==============================
 # Camera Setup
 # ==============================
@@ -59,11 +86,14 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         font = ImageFont.load_default()
 
     if center:
-        w = frame.shape[1]
         bbox = draw.textbbox((0,0), text, font=font)
         text_w = bbox[2] - bbox[0]
-        x = (w - text_w) // 2
-        draw.text((x, pos[1]), text, font=font, fill=color)
+        text_h = bbox[3] - bbox[1]
+
+        x = pos[0] - text_w // 2
+        y = pos[1] - text_h // 2 - 3
+
+        draw.text((x, y), text, font=font, fill=color)
     else:
         draw.text(pos, text, font=font, fill=color)
 
@@ -106,13 +136,16 @@ while cap.isOpened():
 
         color = (0,255,255) if hover_number == num else (255,255,255)
 
+        cv2.circle(frame,(x,y),55,color,2)
+
         frame = draw_text(
             frame,
             num,
-            (x - 15, y - 25),
+            (x,y),
             42,
             color,
-            "Montserrat-SemiBold.ttf"
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     # ==============================
@@ -126,6 +159,15 @@ while cap.isOpened():
         
         current, total = lesson.get_progress()
         frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
+
+        if current <=4:
+            level = "EASY"
+        elif current <=7:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(frame, f"LEVEL: {level}", (980,70), 28, (0,255,255))
 
         frame = draw_text(
             frame,
@@ -155,6 +197,10 @@ while cap.isOpened():
 
                 if hover_frames > HOVER_THRESHOLD and answer_cooldown == 0:
                     lesson.check_answer(selected_number)
+
+                    if lesson.feedback == "correct" and not lesson.lesson_finished():
+                        shuffle_numbers()
+
                     answer_cooldown = 30
                     hover_frames = 0
                     hover_number = None

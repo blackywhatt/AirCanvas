@@ -30,24 +30,51 @@ planets = list(planet_size.keys())
 # ==============================
 # Generate Questions
 # ==============================
-questions = []
+questions = [
 
-for _ in range(5):
-    p1, p2 = random.sample(planets, 2)
+    # EASY
+    {"question":"Which planet is BIGGER?", "type":"bigger", "left":"earth", "right":"mars", "answer":"correct"},
+    {"question":"Which planet is BIGGER?", "type":"bigger", "left":"jupiter", "right":"venus", "answer":"correct"},
+    {"question":"Which planet is SMALLER?", "type":"smaller", "left":"saturn", "right":"neptune", "answer":"correct"},
+    {"question":"Which planet is BIGGER?", "type":"bigger", "left":"uranus", "right":"mercury", "answer":"correct"},
 
-    if planet_size[p1] > planet_size[p2]:
-        answer = p1
-    else:
-        answer = p2
+    # MEDIUM
+    {"question":"Which planet has RINGS?", "type":"rings", "left":"saturn", "right":"earth", "answer":"correct"},
+    {"question":"Which planet is known as RED planet?", "type":"red", "left":"mars", "right":"venus", "answer":"correct"},
+    {"question":"Which planet do humans live on?", "type":"home", "left":"earth", "right":"neptune", "answer":"correct"},
 
-    questions.append({
-        "question": f"Which is bigger? {p1.upper()} or {p2.upper()}",
-        "answer": answer,
-        "left": p1,
-        "right": p2
-    })
+    # HARD
+    {"question":"Which planet is BIGGEST?", "type":"bigger", "left":"jupiter", "right":"saturn", "answer":"correct"},
+    {"question":"Which planet is SMALLEST?", "type":"smaller", "left":"mercury", "right":"mars", "answer":"correct"},
+    {"question":"Which planet is farther from Sun?", "type":"farther", "left":"venus", "right":"neptune", "answer":"correct"},
+]
 
 lesson = LessonEngine(questions)
+
+def get_correct_answer(q):
+
+    left = q["left"]
+    right = q["right"]
+
+    if q["type"] == "bigger":
+        return left if planet_size[left] > planet_size[right] else right
+
+    elif q["type"] == "smaller":
+        return left if planet_size[left] < planet_size[right] else right
+
+    elif q["type"] == "rings":
+        return "saturn"
+
+    elif q["type"] == "red":
+        return "mars"
+
+    elif q["type"] == "home":
+        return "earth"
+
+    elif q["type"] == "farther":
+        return left if planet_size[left] > planet_size[right] else right
+
+    return left
 
 # ==============================
 # Positions
@@ -82,11 +109,18 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         font = ImageFont.load_default()
 
     if center:
-        w = frame.shape[1]
         bbox = draw.textbbox((0,0), text, font=font)
+
         text_w = bbox[2] - bbox[0]
-        x = (w - text_w) // 2
-        draw.text((x, pos[1]), text, font=font, fill=color)
+        text_h = bbox[3] - bbox[1]
+
+        x = (frame.shape[1] - text_w) // 2
+        y = pos[1]
+
+        if x < 20:
+            x = 20
+
+        draw.text((x, y), text, font=font, fill=color)
     else:
         draw.text(pos, text, font=font, fill=color)
 
@@ -113,9 +147,9 @@ def detect_selected(ix, iy, q):
 def draw_planet(frame, name, x, y, highlight=False):
 
     color_map = {
-        "mercury": (200,200,200),
-        "venus": (0,200,255),
-        "earth": (255,100,0),
+        "mercury": (180,180,180),
+        "venus": (0,220,255),
+        "earth": (255,120,0),
         "mars": (0,0,255),
         "jupiter": (0,165,255),
         "saturn": (0,255,255),
@@ -123,18 +157,50 @@ def draw_planet(frame, name, x, y, highlight=False):
         "neptune": (255,0,0)
     }
 
+    # Visual sizes
+    radius_map = {
+        "mercury": 45,
+        "mars": 50,
+        "venus": 60,
+        "earth": 62,
+        "neptune": 70,
+        "uranus": 75,
+        "saturn": 85,
+        "jupiter": 95
+    }
+
     color = (0,255,255) if highlight else color_map[name]
+    r = radius_map[name]
 
-    cv2.circle(frame, (x,y), 70, color, -1)
+    # Saturn ring
+    if name == "saturn":
+        cv2.ellipse(frame, (x,y), (r+18, r-12), 0, 0, 360, (180,180,180), 3)
 
-    frame = draw_text(
-        frame,
-        name.upper(),
-        (x - 60, y + 90),
-        24,
-        (255,255,255),
-        "Montserrat-SemiBold.ttf"
-    )
+    # Planet body
+    cv2.circle(frame, (x,y), r, color, -1)
+
+    # Planet name
+    label = name.upper()
+
+    img_pil = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img_pil)
+
+    font_path = os.path.join(FONT_DIR, "Montserrat-SemiBold.ttf")
+
+    try:
+        font = ImageFont.truetype(font_path, 24)
+    except:
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0,0), label, font=font)
+    text_w = bbox[2] - bbox[0]
+
+    text_x = x - text_w // 2
+    text_y = y + r + 30
+
+    draw.text((text_x, text_y), label, font=font, fill=(255,255,255))
+
+    frame = np.array(img_pil)
 
     return frame
 # ==============================
@@ -156,6 +222,24 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+
+        current, total = lesson.get_progress()
+
+        if current <= 3:
+            level = "EASY"
+        elif current <= 6:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(
+            frame,
+            f"LEVEL: {level}",
+            (980,90),
+            28,
+            (0,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
         if q is None:
             continue
@@ -197,7 +281,12 @@ while cap.isOpened():
                     hover_frames = 0
 
                 if hover_frames > HOVER_THRESHOLD:
-                    lesson.check_answer(selected)
+                    correct = get_correct_answer(q)
+                    if selected == correct:
+                        lesson.check_answer("correct")
+                    else:
+                        lesson.feedback = "wrong"
+                        lesson.feedback_timer = 25
                     hover_frames = 0
                     hover_planet = None
 

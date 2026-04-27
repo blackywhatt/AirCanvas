@@ -14,10 +14,22 @@ HOVER_THRESHOLD = 25
 # Questions
 # ==============================
 questions = [
-    {"question": "Select the smallest planet near the sun", "answer": "mercury"},
-    {"question": "Select the hottest planet with thick clouds", "answer": "venus"},
-    {"question": "Select the only planet that supports life", "answer": "earth"},
-    {"question": "Select the red planet with huge volcanoes", "answer": "mars"}
+
+    # EASY
+    {"question":"Select the smallest planet near the sun", "answer":"mercury"},
+    {"question":"Select the hottest planet with thick clouds", "answer":"venus"},
+    {"question":"Select the only planet that supports life", "answer":"earth"},
+    {"question":"Select the red planet with huge volcanoes", "answer":"mars"},
+
+    # MEDIUM
+    {"question":"Select the planet called Morning Star", "answer":"venus"},
+    {"question":"Select the planet with blue oceans", "answer":"earth"},
+    {"question":"Select the planet closest to the Sun", "answer":"mercury"},
+
+    # HARD
+    {"question":"Select the 4th planet from the Sun", "answer":"mars"},
+    {"question":"Select the fastest orbiting planet", "answer":"mercury"},
+    {"question":"Select the planet humans call home", "answer":"earth"}
 ]
 
 lesson = LessonEngine(questions)
@@ -59,10 +71,14 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         font = ImageFont.load_default()
 
     if center:
-        w = frame.shape[1]
         bbox = draw.textbbox((0,0), text, font=font)
         text_w = bbox[2] - bbox[0]
-        x = (w - text_w) // 2
+
+        x = (frame.shape[1] - text_w) // 2
+
+        if x < 20:
+            x = 20
+
         draw.text((x, pos[1]), text, font=font, fill=color)
     else:
         draw.text(pos, text, font=font, fill=color)
@@ -102,16 +118,38 @@ def draw_planets(frame):
         if hover_planet == name:
             color = (0,255,255)
 
-        cv2.circle(frame, (x,y), 50, color, -1)
+        size_map = {
+            "mercury":50,
+            "venus":65,
+            "earth":67,
+            "mars":55
+        }
 
-        frame = draw_text(
-            frame,
-            name.upper(),
-            (x - 50, y + 80),
-            22,
-            (255,255,255),
-            "Montserrat-SemiBold.ttf"
-        )
+        r = size_map[name]
+
+        cv2.circle(frame, (x,y), r, color, -1)
+
+        label = name.upper()
+
+        img_pil = Image.fromarray(frame)
+        draw = ImageDraw.Draw(img_pil)
+
+        font_path = os.path.join(FONT_DIR, "Montserrat-SemiBold.ttf")
+
+        try:
+            font = ImageFont.truetype(font_path, 22)
+        except:
+            font = ImageFont.load_default()
+
+        bbox = draw.textbbox((0,0), label, font=font)
+        text_w = bbox[2] - bbox[0]
+
+        text_x = x - text_w // 2
+        text_y = y + r + 25
+
+        draw.text((text_x, text_y), label, font=font, fill=(255,255,255))
+
+        frame = np.array(img_pil)
 
     return frame
 # ==============================
@@ -139,6 +177,24 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
 
+        current, total = lesson.get_progress()
+
+        if current <= 3:
+            level = "EASY"
+        elif current <= 6:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        frame = draw_text(
+            frame,
+            f"LEVEL: {level}",
+            (980,40),
+            28,
+            (0,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
+
         if q is None:
             continue
 
@@ -154,7 +210,7 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             q["question"],
-            (0, 80),
+            (0, 100),
             36,
             (255,255,255),
             "Orbitron-Bold.ttf",
