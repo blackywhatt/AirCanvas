@@ -51,6 +51,16 @@ lesson = LessonEngine(questions)
 selected_sequence = []
 planet_positions = {}
 
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
+
+planet_images = {}
+
+for name in planet_order:
+    path = os.path.join(ASSETS_DIR, f"{name}.png")
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is not None:
+        planet_images[name] = img
+
 def load_round():
 
     global selected_sequence
@@ -125,32 +135,53 @@ def detect_selected(ix, iy):
 
     return None
 
+def overlay_image(frame, img, x, y, size):
+    img = cv2.resize(img, (size, size))
+
+    h, w = img.shape[:2]
+
+    x1 = int(x - w / 2)
+    y1 = int(y - h / 2)
+    x2 = x1 + w
+    y2 = y1 + h
+
+    if x1 < 0 or y1 < 0 or x2 > frame.shape[1] or y2 > frame.shape[0]:
+        return frame
+
+    if img.shape[2] == 4:
+        alpha = img[:, :, 3] / 255.0
+        for c in range(3):
+            frame[y1:y2, x1:x2, c] = (
+                alpha * img[:, :, c] +
+                (1 - alpha) * frame[y1:y2, x1:x2, c]
+            )
+    else:
+        frame[y1:y2, x1:x2] = img
+
+    return frame
 
 # ==============================
 # Draw Planet
 # ==============================
 def draw_planet(frame, name, x, y, selected=False, hover=False):
 
-    color_map = {
-        "mercury": (200,200,200),
-        "venus": (0,200,255),
-        "earth": (255,100,0),
-        "mars": (0,0,255),
-        "jupiter": (0,165,255),
-        "saturn": (0,255,255),
-        "uranus": (255,255,0),
-        "neptune": (255,0,0)
-    }
+    r = 60
+
+    # Glow effects
+    if hover:
+        cv2.circle(frame, (x, y), r+10, (0,255,255), 3)
 
     if selected:
-        color = (0,255,0)
-    elif hover:
-        color = (0,255,255)
+        cv2.circle(frame, (x, y), r+15, (0,255,0), 4)
+
+    # Draw image
+    if name in planet_images:
+        size = r * 2
+        frame = overlay_image(frame, planet_images[name], x, y, size)
     else:
-        color = color_map[name]
+        cv2.circle(frame, (x,y), r, (255,255,255), -1)
 
-    cv2.circle(frame, (x,y), 60, color, -1)
-
+    # Label
     frame = draw_text(
         frame,
         name.upper(),

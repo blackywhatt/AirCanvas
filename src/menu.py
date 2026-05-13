@@ -26,7 +26,6 @@ class MainMenuGUI(QWidget):
             Qt.TransformationMode.SmoothTransformation
         )
 
-        # Darken image directly
         dark_pixmap = QPixmap(scaled.size())
         dark_pixmap.fill(Qt.GlobalColor.transparent)
 

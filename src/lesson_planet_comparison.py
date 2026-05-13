@@ -27,6 +27,17 @@ planet_size = {
 
 planets = list(planet_size.keys())
 
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
+
+planet_images = {}
+
+for planet in planets:
+    path = os.path.join(ASSETS_DIR, f"{planet}.png")
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is not None:
+        planet_images[planet] = img
+
+
 # ==============================
 # Generate Questions
 # ==============================
@@ -140,6 +151,31 @@ def detect_selected(ix, iy, q):
 
     return None
 
+def overlay_image(frame, img, x, y, size):
+    img = cv2.resize(img, (size, size))
+
+    h, w = img.shape[:2]
+
+    x1 = int(x - w / 2)
+    y1 = int(y - h / 2)
+    x2 = x1 + w
+    y2 = y1 + h
+
+    # Prevent crash (VERY IMPORTANT)
+    if x1 < 0 or y1 < 0 or x2 > frame.shape[1] or y2 > frame.shape[0]:
+        return frame
+
+    if img.shape[2] == 4:
+        alpha = img[:, :, 3] / 255.0
+        for c in range(3):
+            frame[y1:y2, x1:x2, c] = (
+                alpha * img[:, :, c] +
+                (1 - alpha) * frame[y1:y2, x1:x2, c]
+            )
+    else:
+        frame[y1:y2, x1:x2] = img
+
+    return frame
 
 # ==============================
 # Draw Planet
@@ -169,15 +205,22 @@ def draw_planet(frame, name, x, y, highlight=False):
         "jupiter": 95
     }
 
-    color = (0,255,255) if highlight else color_map[name]
-    r = radius_map[name]
+    color = color_map[name]
+    r = radius_map[name]   
+
+    if highlight:
+        cv2.circle(frame, (x, y), r+10, (0,255,255), 3)
 
     # Saturn ring
-    if name == "saturn":
-        cv2.ellipse(frame, (x,y), (r+18, r-12), 0, 0, 360, (180,180,180), 3)
+    # if name == "saturn":
+    #     cv2.ellipse(frame, (x,y), (r+18, r-12), 0, 0, 360, (180,180,180), 3)
 
     # Planet body
-    cv2.circle(frame, (x,y), r, color, -1)
+    if name in planet_images:
+        size = r * 2
+        frame = overlay_image(frame, planet_images[name], x, y, size)
+    else:
+        cv2.circle(frame, (x,y), r, color, -1)
 
     # Planet name
     label = name.upper()
