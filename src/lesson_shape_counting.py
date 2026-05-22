@@ -13,7 +13,7 @@ CENTER_X = 640
 QUESTION_POS = (CENTER_X, 60)
 FEEDBACK_POS = (CENTER_X, 110)
 
-ANSWER_Y = 190
+ANSWER_Y = 220
 ANSWER_SPACING = 180   
 
 SHAPE_Y_MIN = 320
@@ -27,26 +27,60 @@ NUMBER_RADIUS = 45
 # ==============================
 # FONT SETUP
 # ==============================
-FONTS = os.path.join(os.path.dirname(__file__), "fonts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
-font_title = ImageFont.truetype(os.path.join(FONTS, "Orbitron-Bold.ttf"), 48)
-font_question = ImageFont.truetype(os.path.join(FONTS, "Montserrat-SemiBold.ttf"), 40)
-font_medium = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 30)
-font_small = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 26)
+def draw_text(frame, text, pos, size=40, color=(255,255,255),
+              font_name="Montserrat-Medium.ttf", center=False):
 
+    font_path = os.path.join(FONT_DIR, font_name)
 
-def draw_text(frame, text, position, font, color=(30,30,30), center=False):
-    img_pil = Image.fromarray(frame)
-    draw = ImageDraw.Draw(img_pil)
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        return frame
 
-    color_rgb = (color[2], color[1], color[0])
+    pil_image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil_image)
 
     if center:
-        draw.text(position, text, font=font, fill=color_rgb, anchor="mm")
-    else:
-        draw.text(position, text, font=font, fill=color_rgb)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_w = bbox[2] - bbox[0]
 
-    return np.array(img_pil)
+        x = (frame.shape[1] - text_w) // 2
+        draw.text((x, pos[1]), text, font=font, fill=color)
+
+    else:
+        draw.text(pos, text, font=font, fill=color)
+
+    return np.array(pil_image)
+
+def draw_centered_text(frame, text, box_x, box_y, box_w, box_h,
+                       size=30,
+                       color=(255,255,255),
+                       font_name="Montserrat-SemiBold.ttf"):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        return frame
+
+    pil_image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil_image)
+
+    bbox = draw.textbbox((0,0), text, font=font)
+
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    x = box_x + (box_w - text_w) // 2
+    y = box_y + (box_h - text_h) // 2 - 8
+
+    draw.text((x, y), text, font=font, fill=color)
+
+    return np.array(pil_image)
 
 # ==============================
 # LESSON QUESTIONS
@@ -74,14 +108,88 @@ questions = [
 lesson = LessonEngine(questions)
 
 # ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(
+    question_bar,
+    (900, 110)
+)
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(
+    progress_pill,
+    (115, 70)
+)
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(
+    level_pill,
+    (175, 70)
+)
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(
+    correct_popup,
+    (230, 80)
+)
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(
+    wrong_popup,
+    (230, 80)
+)
+
+# ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
+
+# ==============================
 # NUMBER POSITIONS
 # ==============================
 numbers = [1,2,3,4,5,6]
 
-start_x = CENTER_X - (len(numbers)//2) * ANSWER_SPACING
+total_width = (len(numbers) - 1) * ANSWER_SPACING
+start_x = CENTER_X - total_width // 2
 
 number_positions = {
-    n: (start_x + i*ANSWER_SPACING, ANSWER_Y)
+    n: (start_x + i * ANSWER_SPACING, ANSWER_Y)
     for i, n in enumerate(numbers)
 }
 
@@ -93,17 +201,19 @@ def generate_shapes(target_shape):
     shapes = []
     positions = []
 
-    num_shapes = random.randint(4,6)
+    num_shapes = random.randint(2,6)
 
     # -------------------------
     # Decide correct count
     # -------------------------
     if target_shape in ["corners", "fourside"]:
-        target_count = random.randint(2,5)
+        target_count = random.randint(1, num_shapes)
+
     elif target_shape == "round":
-        target_count = random.randint(1,4)
+        target_count = random.randint(1, num_shapes)
+
     else:
-        target_count = random.randint(1, min(4, num_shapes))
+        target_count = random.randint(1, num_shapes)
 
     # -------------------------
     # helper add shape
@@ -228,7 +338,7 @@ def detect_number(ix,iy):
 
         dist = np.hypot(ix-nx,iy-ny)
 
-        if dist < 80:
+        if dist < 95:
             return number
 
     return None
@@ -247,6 +357,10 @@ cv2.namedWindow(window_name,cv2.WINDOW_NORMAL)
 cv2.setWindowProperty(window_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
 
 answer_cooldown = 0
+
+hover_number = None
+hover_frames = 0
+HOVER_THRESHOLD = 25
 
 # ==============================
 # MAIN LOOP
@@ -274,9 +388,29 @@ while cap.isOpened():
     # ==============================
     for n,(x,y) in number_positions.items():
 
-        cv2.circle(frame,(x,y),NUMBER_RADIUS,(255,255,255),2)
+        hovered = hover_number == n
 
-        frame = draw_text(frame, str(n), (x, y), font_small, center=True)
+        radius = 55 if hovered else NUMBER_RADIUS
+
+        circle_color = (0,255,255) if hovered else (255,255,255)
+
+        cv2.circle(
+            frame,
+            (x,y),
+            radius,
+            circle_color,
+            3,
+            cv2.LINE_AA
+        )
+
+        frame = draw_text(
+            frame,
+            str(n),
+            (x - 8, y - 18),
+            30,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
 
     # ==============================
     # GET CURSOR
@@ -285,46 +419,85 @@ while cap.isOpened():
 
         ix,iy = index_positions[0]
 
-        cv2.circle(frame,(ix,iy),10,(0,255,255),-1)
+        # Cursor
+        cv2.circle(frame,(ix,iy),6,(255,255,255),-1,cv2.LINE_AA)
+        cv2.circle(frame,(ix,iy),14,(255,255,255),2,cv2.LINE_AA)
 
         selected = detect_number(ix,iy)
 
-        if not lesson.lesson_finished() and answer_cooldown == 0 and gesture == "draw" and selected:
+        if selected:
 
-            q = lesson.get_current_question()
-
-            if q["shape"] == "fourside":
-                count = sum(1 for s in shapes if s[0] in ["square","rectangle"])
-
-            elif q["shape"] == "corners":
-                count = sum(1 for s in shapes if s[0] != "circle")
-
-            elif q["shape"] == "round":
-                count = sum(1 for s in shapes if s[0] == "circle")
-
+            if hover_number == selected:
+                hover_frames += 1
             else:
-                count = sum(1 for s in shapes if s[0] == q["shape"])
+                hover_number = selected
+                hover_frames = 0
 
-            q["answer"] = count
+            if hover_frames > HOVER_THRESHOLD and answer_cooldown == 0:
 
-            lesson.check_answer(selected)
-
-            if not lesson.lesson_finished():
                 q = lesson.get_current_question()
-                shapes = generate_shapes(q["shape"])
 
-            answer_cooldown = 30
+                if q["shape"] == "fourside":
+                    count = sum(1 for s in shapes if s[0] in ["square","rectangle"])
 
+                elif q["shape"] == "corners":
+                    count = sum(1 for s in shapes if s[0] != "circle")
 
-    # ==============================
-    # LESSON TEXT
-    # ==============================
+                elif q["shape"] == "round":
+                    count = sum(1 for s in shapes if s[0] == "circle")
+
+                else:
+                    count = sum(1 for s in shapes if s[0] == q["shape"])
+
+                q["answer"] = count
+
+                lesson.check_answer(selected)
+
+                if not lesson.lesson_finished():
+                    q = lesson.get_current_question()
+                    shapes = generate_shapes(q["shape"])
+
+                answer_cooldown = 30
+
+                hover_frames = 0
+                hover_number = None
+
+        else:
+            hover_number = None
+            hover_frames = 0
+
+    else:
+        hover_number = None
+        hover_frames = 0
+
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
         current, total = lesson.get_progress()
-        frame = draw_text(frame, f"{current}/{total}", (1100,30), font_small)   
 
+        # ==============================
+        # PROGRESS PILL
+        # ==============================
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
+
+        frame = draw_centered_text(
+            frame,
+            f"{current}/{total}",
+            1120,
+            40,
+            115,
+            70,
+            24
+        )
+
+        # ==============================
+        # LEVEL
+        # ==============================
         if current <=4:
             level = "EASY"
         elif current <=7:
@@ -332,22 +505,102 @@ while cap.isOpened():
         else:
             level = "HARD"
 
-        frame = draw_text(frame, f"LEVEL: {level}", (1000,70), font_small)
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
 
-        frame = draw_text(frame, q["question"], QUESTION_POS, font_question, center=True)
+        frame = draw_centered_text(
+            frame,
+            level,
+            1060,
+            90,
+            175,
+            70,
+            26
+        )
 
+        # ==============================
+        # QUESTION BAR
+        # ==============================
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
+        )
+
+        frame = draw_text(
+            frame,
+            q["question"],
+            (130, 50),
+            32,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
+
+        # ==============================
+        # FEEDBACK
+        # ==============================
         if lesson.feedback == "correct":
-            frame = draw_text(frame, "Correct!", FEEDBACK_POS, font_medium, (0,255,0), center=True)
+
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                100
+            )
+
+            frame = draw_text(
+                frame,
+                "Correct!",
+                (105, 120),
+                24,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
         elif lesson.feedback == "wrong":
-            frame = draw_text(frame, "Try Again", FEEDBACK_POS, font_medium, (255,0,0), center=True)
+
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                100
+            )
+
+            frame = draw_text(
+                frame,
+                "Try Again",
+                (105, 120),
+                24,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
 
     else:
 
-        frame = draw_text(frame, "Lesson Complete!", QUESTION_POS, font_title, (0,150,150), center=True)
+        frame = draw_text(
+            frame,
+            "Lesson Complete!",
+            (0, 260),
+            42,
+            (255,255,255),
+            "Montserrat-Bold.ttf",
+            center=True
+        )
 
-        frame = draw_text(frame, f"Score: {lesson.score}", FEEDBACK_POS, font_medium, center=True)
-
+        frame = draw_text(
+            frame,
+            f"Score : {lesson.score}",
+            (0, 330),
+            30,
+            (220,220,220),
+            "Montserrat-SemiBold.ttf",
+            center=True
+        )
 
     if answer_cooldown > 0:
         answer_cooldown -= 1

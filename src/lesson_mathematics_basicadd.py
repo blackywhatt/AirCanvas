@@ -5,44 +5,111 @@ from gesture_engine import get_gesture
 from lesson_engine import LessonEngine
 import os
 from PIL import ImageFont, ImageDraw, Image
-
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
+ASSETS_DIR = os.path.join(BASE_DIR, "..", "assets")
 hover_number = None
 hover_frames = 0
 HOVER_THRESHOLD = 25
+
+# ==============================
+# LOAD OBJECT PNGS
+# ==============================
+object_images = {}
+
+for obj in ["star","phone","ball","pizza"]:
+
+    path = os.path.join(ASSETS_DIR, f"{obj}.png")
+
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+
+    if img is not None:
+        object_images[obj] = img
 
 # ==============================
 # Generate Questions
 # ==============================
 questions = []
 
+object_types = ["star","phone","ball","pizza"]
+
+# ==============================
+# ADDITION QUESTIONS
+# ==============================
 for _ in range(5):
-    a = random.randint(1, 4)
-    b = random.randint(1, 4)
-    total = a + b
+
+    a = random.randint(1,3)
+    b = random.randint(1,3)
 
     questions.append({
-        "question": f"{a} + {b}",
-        "answer": str(total),
-        "a": a,
-        "b": b
+
+        "operation":"+",
+        "a":a,
+        "b":b,
+        "answer":str(a+b),
+        "object":random.choice(object_types)
+
     })
 
+# ==============================
+# SUBTRACTION QUESTIONS
+# ==============================
+for _ in range(5):
+
+    a = random.randint(3,6)
+    b = random.randint(1,a-1)
+
+    questions.append({
+
+        "operation":"-",
+        "a":a,
+        "b":b,
+        "answer":str(a-b),
+        "object":random.choice(object_types)
+
+    })
+
+random.shuffle(questions)
+
 lesson = LessonEngine(questions)
+
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(question_bar,(900,110))
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(progress_pill,(115,70))
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(correct_popup,(230,80))
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(wrong_popup,(230,80))
 
 # ==============================
 # Number Positions
 # ==============================
 number_positions = {
-    "1": (100, 500),
-    "2": (250, 500),
-    "3": (400, 500),
-    "4": (550, 500),
-    "5": (700, 500),
-    "6": (850, 500),
-    "7": (1000, 500),
-    "8": (1150, 500)
+    "1": (190,240),
+    "2": (370,240),
+    "3": (550,240),
+    "4": (730,240),
+    "5": (910,240),
+    "6": (1090,240)
 }
 
 # ==============================
@@ -83,6 +150,31 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
     return np.array(img_pil)
 
 # ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
+
+# ==============================
 # Detect selection
 # ==============================
 def detect_selected_number(ix, iy):
@@ -95,21 +187,61 @@ def detect_selected_number(ix, iy):
 
     return None
 
+def draw_objects(frame, count, center_x, object_name):
 
-# ==============================
-# Draw Apples
-# ==============================
-def draw_apples(frame, count, start_x):
+    img = object_images[object_name]
 
-    y = 300
+    # Use a slightly smaller size so 6 objects never feel cramped
+    obj_size = 80
+    gap_x = 90
+    gap_y = 95
 
-    for i in range(count):
-        x = start_x + i * 70
+    # One row for small counts, two rows for larger counts
+    if count <= 3:
+        y = 430
+        total_width = (count - 1) * gap_x
+        start_x = center_x - total_width // 2
 
-        cv2.circle(frame, (x, y), 25, (0,0,255), -1)
-        cv2.circle(frame, (x, y-30), 8, (0,255,0), -1)
+        positions = [(start_x + i * gap_x, y) for i in range(count)]
 
+    else:
+        top_count = (count + 1) // 2
+        bottom_count = count - top_count
 
+        top_total_width = (top_count - 1) * gap_x
+        bottom_total_width = (bottom_count - 1) * gap_x
+
+        top_start_x = center_x - top_total_width // 2
+        bottom_start_x = center_x - bottom_total_width // 2
+
+        positions = []
+
+        # top row
+        for i in range(top_count):
+            positions.append((top_start_x + i * gap_x, 400))
+
+        # bottom row
+        for i in range(bottom_count):
+            positions.append((bottom_start_x + i * gap_x, 495))
+
+    for x, y in positions:
+
+        resized = cv2.resize(img, (obj_size, obj_size))
+        h, w = resized.shape[:2]
+
+        x1 = x - w // 2
+        y1 = y - h // 2
+
+        if x1 < 0 or y1 < 0 or x1 + w > frame.shape[1] or y1 + h > frame.shape[0]:
+            continue
+
+        alpha = resized[:, :, 3] / 255.0
+
+        for c in range(3):
+            frame[y1:y1+h, x1:x1+w, c] = (
+                alpha * resized[:, :, c] +
+                (1 - alpha) * frame[y1:y1+h, x1:x1+w, c]
+            )
 # ==============================
 # Main Loop
 # ==============================
@@ -136,55 +268,108 @@ while cap.isOpened():
             continue
 
         current, total = lesson.get_progress()
-        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
+        # QUESTION BAR
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
+        )
 
-        # Draw first group
-        draw_apples(frame, q["a"], 200)
-
-        # Draw plus sign
         frame = draw_text(
             frame,
-            "+",
-            (500, 240),
-            64,
+            "Solve the math question",
+            (130,50),
+            30,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf"
+        )
+
+        # PROGRESS
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
+
+        frame = draw_text(
+            frame,
+            f"{current}/{total}",
+            (1150,55),
+            26,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+        )
+
+        draw_objects(
+            frame,
+            q["a"],
+            320,
+            q["object"]
+        )
+        
+        frame = draw_text(
+            frame,
+            q["operation"],
+            (545,395),
+            72,
             (255,255,255),
             "Orbitron-Bold.ttf"
         )
-
-        # Draw second group
-        draw_apples(frame, q["b"], 600)
-
-        # Draw equals
+        
+        draw_objects(
+            frame,
+            q["b"],
+            820,
+            q["object"]
+        )
+   
         frame = draw_text(
             frame,
             "=",
-            (900, 240),
-            64,
+            (965,395),
+            72,
             (255,255,255),
             "Orbitron-Bold.ttf"
         )
-
+        
         # Draw question mark
         frame = draw_text(
             frame,
             "?",
-            (1000, 240),
+            (1110,395),
             64,
             (0,255,255),
             "Orbitron-Bold.ttf"
         )
 
-        # Draw answer choices
+        # ==============================
+        # Draw Answer Choices
+        # ==============================
         for num, (x, y) in number_positions.items():
 
-            color = (0,255,255) if hover_number == num else (255,255,255)
+            hovered = (hover_number == num)
+
+            radius = 58 if hovered else 50
+
+            color = (0,255,255) if hovered else (255,255,255)
+
+            cv2.circle(
+                frame,
+                (x,y),
+                radius,
+                color,
+                3,
+                cv2.LINE_AA
+            )
 
             frame = draw_text(
                 frame,
                 num,
-                (x - 15, y - 20),
-                36,
-                color,
+                (x-14,y-26),
+                38,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
@@ -217,22 +402,38 @@ while cap.isOpened():
         # Feedback
         # ==============================
         if lesson.feedback == "correct":
+
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                120
+            )
+
             frame = draw_text(
                 frame,
                 "Correct!",
-                (40, 50),
-                30,
-                (0,255,0),
+                (105,140),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
         elif lesson.feedback == "wrong":
+
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                120
+            )
+
             frame = draw_text(
                 frame,
                 "Try Again",
-                (40, 50),
-                30,
-                (0,0,255),
+                (105,140),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
@@ -240,19 +441,21 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Lesson Complete!",
-            (40, 30),
-            36,
-            (0,255,255),
-            "Orbitron-Bold.ttf"
+            (0,260),
+            42,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
         frame = draw_text(
             frame,
-            f"Score: {lesson.score}",
-            (40, 80),
+            f"Score : {lesson.score}",
+            (0,330),
             30,
-            (255,255,255),
-            "Montserrat-SemiBold.ttf"
+            (220,220,220),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     # cooldown

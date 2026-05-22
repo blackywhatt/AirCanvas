@@ -6,7 +6,8 @@ import os
 from PIL import ImageFont
 from PIL import ImageDraw, Image
 
-def draw_text(frame, text, position, font, color=(0,0,0), center=False):
+def draw_text(frame, text, position, font, color=(255,255,255), center=False):
+    
     img_pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(img_pil)
 
@@ -26,9 +27,34 @@ ASSETS = os.path.join(os.path.dirname(__file__), "..", "assets")
 FONTS = os.path.join(os.path.dirname(__file__), "fonts")
 font_title = ImageFont.truetype(os.path.join(FONTS, "Orbitron-Bold.ttf"), 48)
 font_large = ImageFont.truetype(os.path.join(FONTS, "Montserrat-SemiBold.ttf"), 40)
-font_medium = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 30)
-font_small = ImageFont.truetype(os.path.join(FONTS, "Montserrat-Regular.ttf"), 24)
-ICON_SIZE = 90
+font_medium = ImageFont.truetype(os.path.join(FONTS, "Montserrat-SemiBold.ttf"), 30)
+font_small = ImageFont.truetype(os.path.join(FONTS, "Montserrat-SemiBold.ttf"), 24)
+ICON_SIZE = 140
+
+# ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
 
 def load_icon(name):
 
@@ -64,8 +90,15 @@ def load_icon(name):
     return img
 
 ball_img = load_icon("ball.png")
-pizza_img = load_icon("pizza.png")
+clock_img = load_icon("clock.png")
 window_img = load_icon("window.png")
+giftbox_img = load_icon("giftbox.png")
+dice_img = load_icon("dice.png")
+pizza_img = load_icon("pizza.png")
+sandwich_img = load_icon("sandwich.png")
+phone_img = load_icon("phone.png")
+door_img = load_icon("door.png")
+starfish_img = load_icon("starfish.png")
 
 def draw_png(frame, png, x, y):
 
@@ -92,28 +125,86 @@ def draw_png(frame, png, x, y):
 # LESSON QUESTIONS
 # ==============================
 questions = [
+
+    # EASY
     {"question":"Match BALL to its shape","answer":"circle","object":"ball"},
     {"question":"Match WINDOW to its shape","answer":"square","object":"window"},
-    {"question":"Match PIZZA to its shape","answer":"triangle","object":"pizza"}
+    {"question":"Match PIZZA to its shape","answer":"triangle","object":"pizza"},
+
+    # MEDIUM
+    {"question":"Match CLOCK to its shape","answer":"circle","object":"clock"},
+    {"question":"Match GIFTBOX to its shape","answer":"square","object":"giftbox"},
+    {"question":"Match SANDWICH to its shape","answer":"triangle","object":"sandwich"},
+
+    # HARD
+    {"question":"Match PHONE to its shape","answer":"rectangle","object":"phone"},
+    {"question":"Match DOOR to its shape","answer":"rectangle","object":"door"},
+    {"question":"Match STARFISH to its shape","answer":"star","object":"starfish"},
+    {"question":"Match DICE to its shape","answer":"square","object":"dice"}
+
 ]
 
 lesson = LessonEngine(questions)
 
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(question_bar,(900,110))
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(progress_pill,(115,70))
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(level_pill,(175,70))
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(correct_popup,(230,80))
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(wrong_popup,(230,80))
 
 # ==============================
 # SHAPE POSITIONS
 # ==============================
 shape_positions = {
-    "circle":(320,500),
-    "square":(640,500),
-    "triangle":(960,500)
-}
 
+    # LEFT
+    "circle":(190,410),
+
+    # TOP LEFT
+    "square":(410,250),
+
+    # TOP CENTER
+    "triangle":(640,200),
+
+    # TOP RIGHT
+    "rectangle":(870,250),
+
+    # RIGHT
+    "star":(1090,410)
+
+}
 
 # ==============================
 # OBJECT START POSITION
 # ==============================
-object_pos = np.array([640,200])
+object_pos = np.array([640,450])
 dragging = False
 drag_offset = np.array([0,0])
 drop_cooldown = 0
@@ -139,7 +230,7 @@ def detect_shape_target(x,y):
 
         dist = np.hypot(x-sx,y-sy)
 
-        if dist < 120:
+        if dist < 100:
             return shape
 
     return None
@@ -161,7 +252,6 @@ while cap.isOpened():
 
     lesson.update()
 
-
     # ==============================
     # GET CURSOR
     # ==============================
@@ -170,22 +260,55 @@ while cap.isOpened():
     else:
         ix,iy = None,None
 
-
     # ==============================
     # DRAW SHAPES
     # ==============================
-    cv2.circle(frame,shape_positions["circle"],60,(255,255,255),3)
 
+    # CIRCLE
+    cv2.circle(frame,shape_positions["circle"],45,(255,255,255),3)
+
+    # SQUARE
     x,y = shape_positions["square"]
-    cv2.rectangle(frame,(x-60,y-60),(x+60,y+60),(255,255,255),3)
+    cv2.rectangle(frame,(x-45,y-45),(x+45,y+45),(255,255,255),3)
 
+    # TRIANGLE
     x,y = shape_positions["triangle"]
-    pts = np.array([[x,y-70],[x-60,y+60],[x+60,y+60]],np.int32)
+    pts = np.array([[x,y-55],[x-45,y+45],[x+45,y+45]],np.int32)
     cv2.polylines(frame,[pts],True,(255,255,255),3)
 
-    frame = draw_text(frame, "Circle", (320, 610), font_small, center=True)
-    frame = draw_text(frame, "Square", (640, 610), font_small, center=True)
-    frame = draw_text(frame, "Triangle", (960, 610), font_small, center=True)
+    # RECTANGLE
+    x,y = shape_positions["rectangle"]
+    cv2.rectangle(frame,(x-70,y-40),(x+70,y+40),(255,255,255),3)
+
+    # STAR
+    x,y = shape_positions["star"]
+
+    star_pts = np.array([
+        [x,y-50],
+        [x-15,y-15],
+        [x-50,y-15],
+        [x-22,y+8],
+        [x-35,y+45],
+        [x,y+22],
+        [x+35,y+45],
+        [x+22,y+8],
+        [x+50,y-15],
+        [x+15,y-15]
+    ], np.int32)
+
+    cv2.polylines(frame,[star_pts],True,(255,255,255),3)
+
+    # LABELS
+    frame = draw_text(frame,"Circle",(190,480),font_small,center=True)
+
+    frame = draw_text(frame,"Square",(410,330),font_small,center=True)
+
+    frame = draw_text(frame,"Triangle",(640,290),font_small,center=True)
+
+    frame = draw_text(frame,"Rectangle",(870,330),font_small,center=True)
+
+    frame = draw_text(frame,"Star",(1090,480),font_small,center=True)
+    
     # ==============================
     # DRAW OBJECT (PNG)
     # ==============================
@@ -204,11 +327,32 @@ while cap.isOpened():
     if obj == "ball":
         draw_png(frame,ball_img,x,y)
 
+    elif obj == "clock":
+        draw_png(frame,clock_img,x,y)
+
     elif obj == "window":
         draw_png(frame,window_img,x,y)
 
+    elif obj == "giftbox":
+        draw_png(frame,giftbox_img,x,y)
+
+    elif obj == "dice":
+        draw_png(frame,dice_img,x,y)
+
     elif obj == "pizza":
         draw_png(frame,pizza_img,x,y)
+
+    elif obj == "sandwich":
+        draw_png(frame,sandwich_img,x,y)
+
+    elif obj == "phone":
+        draw_png(frame,phone_img,x,y)
+
+    elif obj == "door":
+        draw_png(frame,door_img,x,y)
+
+    elif obj == "starfish":
+        draw_png(frame,starfish_img,x,y)
 
 
     # ==============================
@@ -235,7 +379,7 @@ while cap.isOpened():
                 if target and drop_cooldown == 0:
                     object_pos[:] = shape_positions[target]
                     lesson.check_answer(target)
-                    object_pos[:] = [640,200]
+                    object_pos[:] = [640,450]
 
                     drop_cooldown = 20
 
@@ -252,19 +396,121 @@ while cap.isOpened():
 
         q = lesson.get_current_question()
         current, total = lesson.get_progress()
-        frame = draw_text(frame, f"{current}/{total}", (1100,40), font_small)
-        frame = draw_text(frame, q["question"], (40,40), font_large)
 
+        # LEVEL
+        if current <= 3:
+            level = "EASY"
+        elif current <= 6:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
+
+        # QUESTION BAR
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
+        )
+
+        frame = draw_text(
+            frame,
+            q["question"],
+            (120,50),
+            font_medium,
+            (255,255,255)
+        )
+
+        # PROGRESS
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
+
+        frame = draw_text(
+            frame,
+            f"{current}/{total}",
+            (1177,70),
+            font_small,
+            (255,255,255),
+            center=True
+        )
+
+        # LEVEL
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
+
+        frame = draw_text(
+            frame,
+            level,
+            (1150,115),
+            font_small,
+            (255,255,255),
+            center=True
+        )
+
+        # FEEDBACK
         if lesson.feedback == "correct":
-            frame = draw_text(frame, "Correct!", (640, 110), font_large, (0,255,0), center=True)
+
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                100
+            )
+
+            frame = draw_text(
+                frame,
+                "Correct!",
+                (155, 130),
+                font_small,
+                (255,255,255),
+                center=True
+            )
 
         elif lesson.feedback == "wrong":
-            frame = draw_text(frame, "Try Again", (640, 110), font_large, (255,0,0), center=True)
+
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                100
+            )
+
+            frame = draw_text(
+                frame,
+                "Try Again",
+                (155, 130),
+                font_small,
+                (255,255,255),
+                center=True
+            )
 
     else:
 
-        frame = draw_text(frame, "Lesson Complete!", (640, 60), font_title, (0,255,255), center=True)
-        frame = draw_text(frame, f"Score: {lesson.score}", (640, 130), font_medium, center=True)   
+        frame = draw_text(
+            frame,
+            "Lesson Complete!",
+            (640,260),
+            font_title,
+            (255,255,255),
+            center=True
+        )
+
+        frame = draw_text(
+            frame,
+            f"Score : {lesson.score}",
+            (640,330),
+            font_medium,
+            (220,220,220),
+            center=True
+        )   
 
     if drop_cooldown > 0:
         drop_cooldown -= 1

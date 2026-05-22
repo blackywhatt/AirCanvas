@@ -37,6 +37,36 @@ thickness = 3
 ERASE_MODE = False
 CLEAR_FLAG = False
 
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(
+    question_bar,
+    (900, 110)
+)
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(
+    correct_popup,
+    (230, 80)
+)
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(
+    wrong_popup,
+    (230, 80)
+)
+
 def audio_callback(indata, frames, time, status):
     audio_queue.put(bytes(indata))
 
@@ -63,6 +93,31 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         draw.text(pos, text, font=font, fill=color)
 
     return np.array(img_pil)
+
+# ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
 
 def render_strokes(frame):
 
@@ -218,12 +273,12 @@ def run():
                 raw_y = max(0, min(h, raw_y))
 
                 # Bounding box, buang if buruk
-                x_min = int(np.min(landmarks[:, 0]) * w)
-                y_min = int(np.min(landmarks[:, 1]) * h)
-                x_max = int(np.max(landmarks[:, 0]) * w)
-                y_max = int(np.max(landmarks[:, 1]) * h)
+                # x_min = int(np.min(landmarks[:, 0]) * w)
+                # y_min = int(np.min(landmarks[:, 1]) * h)
+                # x_max = int(np.max(landmarks[:, 0]) * w)
+                # y_max = int(np.max(landmarks[:, 1]) * h)
 
-                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+                # cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
 
                 mp_drawing = mp.solutions.drawing_utils
                 mp_styles = mp.solutions.drawing_styles
@@ -300,9 +355,23 @@ def run():
 
                 status_text = "DRAWING..." if drawing else "HOLD TO START"
 
-                # Draw cursor
-                cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 2)
-                cv2.circle(frame, (cx, cy), 3, (0, 255, 0), -1)
+                cv2.circle(
+                    frame,
+                    (cx, cy),
+                    16,
+                    (255,255,255),
+                    2,
+                    cv2.LINE_AA
+                )
+
+                cv2.circle(
+                    frame,
+                    (cx, cy),
+                    5,
+                    current_color,
+                    -1,
+                    cv2.LINE_AA
+                )
 
                 # ======================
                 # DRAWING
@@ -338,57 +407,62 @@ def run():
             # ======================
             # UI PANEL
             # ======================
-            cv2.rectangle(combined, (0, 0), (w, 50), (30, 30, 30), -1)
-
-            mode_text = "ERASE" if ERASE_MODE else "DRAW"
-            color_text = f"Color: {current_color}"
-
+            combined = overlay_png(
+                combined,
+                question_bar,
+                25,
+                20
+            )
+            
             combined = draw_text(
                 combined,
-                "Accessibility Mode",
-                (20, 15),
-                24,
+                "Accessibility Drawing",
+                (120, 50),
+                32,
                 (255,255,255),
-                "Orbitron-Bold.ttf"
-            )
-
-            combined = draw_text(
-                combined,
-                status_text,
-                (280, 15),
-                22,
-                (0,255,255),
-                "Montserrat-Medium.ttf"
-            )
-
-            combined = draw_text(
-                combined,
-                mode_text,
-                (520, 15),
-                22,
-                (0,255,0),
                 "Montserrat-SemiBold.ttf"
             )
 
             combined = draw_text(
                 combined,
-                color_text,
-                (700, 15),
-                20,
+                status_text,
+                (70, 120),
+                22,
                 (255,255,255),
-                "Montserrat-Medium.ttf"
+                "Montserrat-SemiBold.ttf"
+            )
+
+            combined = draw_text(
+                combined,
+                "Brush :",
+                (1080, 60),
+                24,
+                (255,255,255),
+                "Montserrat-SemiBold.ttf"
+            )
+
+            cv2.circle(
+                combined,
+                (1200, 75),
+                18,
+                current_color,
+                -1,
+                cv2.LINE_AA
             )
 
             voice_text = command
 
-            combined = draw_text(
-                combined,
-                f"Voice: {voice_text}",
-                (40, 80),
-                20,
-                (255,255,0),
-                "Montserrat-Medium.ttf"
-            )
+            if voice_text:
+
+                combined = draw_text(
+                    combined,
+                    voice_text.upper(),
+                    (145, 122),
+                    22,
+                    (255,255,255),
+                    "Montserrat-SemiBold.ttf",
+                    center=True
+                )
 
             cv2.imshow(window_name, combined)
 

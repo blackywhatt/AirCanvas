@@ -10,28 +10,55 @@ from PyQt6.QtGui import QFontDatabase, QPixmap, QPainter, QColor
 from ui_components import AnimatedButton, create_back_button, LoadingScreen
 from extra_windows import GuideWindow, SessionManagerWindow
 
-class MainMenuGUI(QWidget):
+class BackgroundWindow(QWidget):
+
+    def __init__(self, background_image="canva.png"):
+        super().__init__()
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        self.background_image = background_image
+
+        self.bg_label = QLabel(self)
+        self.bg_label.lower()
+
     def resizeEvent(self, event):
+
         pixmap = QPixmap(os.path.join(
             self.base_path,
             "..",
             "assets",
-            "background.jpg"
+            self.background_image
         ))
 
         scaled = pixmap.scaled(
-            self.width(),
-            self.height(),
+            self.size(),
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation
         )
 
-        dark_pixmap = QPixmap(scaled.size())
+        x = (scaled.width() - self.width()) // 2
+        y = (scaled.height() - self.height()) // 2
+
+        cropped = scaled.copy(
+            x,
+            y,
+            self.width(),
+            self.height()
+        )
+
+        dark_pixmap = QPixmap(self.size())
         dark_pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(dark_pixmap)
-        painter.drawPixmap(0, 0, scaled)
-        painter.fillRect(dark_pixmap.rect(), QColor(0, 0, 0, 120))
+
+        painter.drawPixmap(0, 0, cropped)
+
+        painter.fillRect(
+            dark_pixmap.rect(),
+            QColor(0, 0, 0, 120)
+        )
+
         painter.end()
 
         self.bg_label.setPixmap(dark_pixmap)
@@ -39,9 +66,11 @@ class MainMenuGUI(QWidget):
         self.bg_label.lower()
 
         super().resizeEvent(event)
+        
+class MainMenuGUI(BackgroundWindow):
 
     def __init__(self):
-        super().__init__()
+        super().__init__("canva.png")
         self.setAutoFillBackground(True)
         self.setWindowTitle("AirCanvas Interface")
         self.setStyleSheet("""
@@ -207,13 +236,23 @@ class MainMenuGUI(QWidget):
         self.session_window = SessionManagerWindow(self)
         self.session_window.show()
 
-class HandModuleWindow(QWidget):
+class HandModuleWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Hand Engine Modules")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -279,13 +318,23 @@ class HandModuleWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
-class VoiceModuleWindow(QWidget):
+class VoiceModuleWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Voice Engine Modules")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -366,13 +415,23 @@ class VoiceModuleWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
-class LessonMenuWindow(QWidget):
+class LessonMenuWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Lessons")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -431,13 +490,23 @@ class LessonMenuWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
-class GeometryLessonWindow(QWidget):
+class GeometryLessonWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Geometry Lessons")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         self.base_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -511,13 +580,23 @@ class GeometryLessonWindow(QWidget):
     def closeEvent(self, event):
         event.accept()
 
-class MathLessonWindow(QWidget):
+class MathLessonWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Mathematics Lessons")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         self.base_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -541,7 +620,7 @@ class MathLessonWindow(QWidget):
             ("Find the Number", "lesson_mathematics_numrecognition.py"),
             ("Count Objects", "lesson_mathematics_countingobjects.py"),
             ("Fill Missing Number", "lesson_mathematics_missingnum.py"),
-            ("Add Numbers", "lesson_mathematics_basicadd.py"),
+            ("Math Challenge", "lesson_mathematics_basicadd.py"),
             ("Arrange Numbers", "lesson_mathematics_numordering.py"),
         ]
 
@@ -592,13 +671,23 @@ class MathLessonWindow(QWidget):
     def closeEvent(self, event):
         event.accept()
 
-class ScienceLessonWindow(QWidget):
+class ScienceLessonWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Science Lessons")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         self.base_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -622,7 +711,6 @@ class ScienceLessonWindow(QWidget):
             ("Find the Planet", "lesson_planet_identification.py"),
             ("Compare Planets", "lesson_planet_comparison.py"),
             ("Planet Order Game", "lesson_planet_order.py"),
-            ("Learn About Planets", "lesson_planet_information.py"),
         ]
 
         for name, file in lessons:
@@ -672,13 +760,23 @@ class ScienceLessonWindow(QWidget):
     def closeEvent(self, event):
         event.accept()
 
-class CreativeLessonWindow(QWidget):
+class CreativeLessonWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
         self.setWindowTitle("Creative Lessons")
         self.showFullScreen()
-        self.setStyleSheet("background-color: #030305;")
+        self.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                color: white;
+                font-family: 'Montserrat';
+            }
+
+            QLabel {
+                background: transparent;
+            }
+        """)
 
         self.base_path = os.path.dirname(os.path.abspath(__file__))
 

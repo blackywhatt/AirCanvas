@@ -13,6 +13,8 @@ FONT_DIR = os.path.join(BASE_DIR, "fonts")
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.dirname(BASE_DIR))
 
+FONT_CACHE = {}
+
 prev_ix = None
 prev_iy = None
 
@@ -71,18 +73,23 @@ simulation_speed = 1.0
 orbit_trails = {i: [] for i in range(len(planets))}
 MAX_TRAIL_LENGTH = 60
 
+def get_cached_font(font_name, size):
+    key = (font_name, size)
+    if key not in FONT_CACHE:
+        font_path = os.path.join(FONT_DIR, font_name)
+        try:
+            FONT_CACHE[key] = ImageFont.truetype(font_path, size)
+        except Exception:
+            FONT_CACHE[key] = ImageFont.load_default()
+    return FONT_CACHE[key]
+
+
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
               font_name="Montserrat-Medium.ttf", center=False):
 
-    font_path = os.path.join(FONT_DIR, font_name)
-
+    font = get_cached_font(font_name, size)
     img_pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(img_pil)
-
-    try:
-        font = ImageFont.truetype(font_path, size)
-    except:
-        font = ImageFont.load_default()
 
     if center:
         w = frame.shape[1]
@@ -95,10 +102,32 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
 
     return np.array(img_pil)
 
+
+def draw_hud_panel(frame, lines, x, y, width, padding=14, bg_color=(20, 20, 40), alpha=0.55):
+    h, w, _ = frame.shape
+    height = padding * 2 + len(lines) * 22
+
+    x2 = min(w - 10, x + width)
+    y2 = min(h - 10, y + height)
+
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x, y), (x2, y2), bg_color, -1)
+    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+    line_y = y + padding
+    for i, line in enumerate(lines):
+        size = 18 if i == 0 else 14
+        font_name = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
+        frame = draw_text(frame, line, (x + 12, line_y), size, (255,255,255), font_name)
+        line_y += 22
+
+    return frame
+
 # ==============================
 # 3D Projection
 # ==============================
 def project_3d(x, y, z, w, h, ax, ay):
+    
     cx, cy = x - w // 2, y - h // 2
 
     rx = cx * np.cos(ay) + z * np.sin(ay)
@@ -643,41 +672,24 @@ while cap.isOpened():
     # ==============================
     # HUD
     # ==============================
-    frame = draw_text(
-        frame,
+    hud_lines = [
         "SOLAR SYSTEM MODE",
-        (0, 20),
-        36,
-        (255,255,255),
-        "Orbitron-Bold.ttf",
-        center=True
-    )
-
-    frame = draw_text(
-        frame,
         f"SELECTED: {planets[selected_index]['name']}",
-        (40, 70),
-        24,
-        (200,200,200),
-        "Montserrat-Medium.ttf"
-    )
-
-    frame = draw_text(
-        frame,
         f"TIME SCALE: {simulation_speed:.1f}x",
-        (40, 100),
-        22,
-        (0,255,255),
-        "Montserrat-Medium.ttf"
-    )
+        f"GESTURE: {gesture.upper() if gesture != 'none' else 'WAITING'}",
+        f"HANDS: {hand_count}"
+    ]
+    frame = draw_hud_panel(frame, hud_lines, 20, 20, 300)
 
-    frame = draw_text(
+    frame = draw_hud_panel(
         frame,
-        "Gestures: Rotate | Two Hands = Zoom | Draw = Select | Erase = Reset | Resize = Speed",
-        (40, h-40),
+        ["Rotate | Zoom | Select | Reset | Speed"],
         20,
-        (180,180,180),
-        "Montserrat-Medium.ttf"
+        h - 50,
+        500,
+        padding=6,
+        bg_color=(14, 14, 32),
+        alpha=0.45
     )
 
     # ==============================

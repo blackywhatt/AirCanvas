@@ -6,31 +6,80 @@ from shapes_mode import get_perfect_shape
 import os
 from PIL import ImageFont, ImageDraw, Image
 
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
+
 # ==============================
 # LESSON QUESTIONS
 # ==============================
 questions = [
 
     # EASY
-    {"question": "EASY 1: Draw a CIRCLE", "answer": "circle"},
-    {"question": "EASY 2: Draw a TRIANGLE", "answer": "triangle"},
-    {"question": "EASY 3: Draw a SQUARE", "answer": "square"},
-    {"question": "EASY 4: Draw another CIRCLE", "answer": "circle"},
+    {"question": "Draw a CIRCLE", "answer": "circle"},
+    {"question": "Draw a TRIANGLE", "answer": "triangle"},
+    {"question": "Draw a SQUARE", "answer": "square"},
+    {"question": "Draw another CIRCLE", "answer": "circle"},
 
     # MEDIUM
-    {"question": "MEDIUM 1: Draw a RECTANGLE", "answer": "rectangle"},
-    {"question": "MEDIUM 2: Draw a PENTAGON", "answer": "pentagon"},
-    {"question": "MEDIUM 3: Draw a STAR", "answer": "star"},
+    {"question": "Draw a RECTANGLE", "answer": "rectangle"},
+    {"question": "Draw a PENTAGON", "answer": "pentagon"},
+    {"question": "Draw a STAR", "answer": "star"},
 
     # HARD
-    {"question": "HARD 1: Draw shape with 3 sides", "answer": "triangle"},
-    {"question": "HARD 2: Draw shape with 5 sides", "answer": "pentagon"},
-    {"question": "HARD 3: Draw reward shape", "answer": "star"},
+    {"question": "Draw shape with 3 sides", "answer": "triangle"},
+    {"question": "Draw shape with 5 sides", "answer": "pentagon"},
+    {"question": "Draw reward shape", "answer": "star"},
 ]
 
 lesson = LessonEngine(questions)
 
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(
+    question_bar,
+    (900, 110)
+)
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(
+    progress_pill,
+    (115, 70)
+)
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(
+    level_pill,
+    (175, 70)
+)
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(
+    correct_popup,
+    (230, 85)
+)
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(
+    wrong_popup,
+    (230, 85)
+)
 
 # ==============================
 # DRAW STORAGE
@@ -61,6 +110,58 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         draw.text(pos, text, font=font, fill=color)
 
     return np.array(img_pil)
+
+def draw_centered_text(frame, text, box_x, box_y, box_w, box_h,
+                       size=30,
+                       color=(255,255,255),
+                       font_name="Montserrat-SemiBold.ttf"):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        return frame
+
+    pil_image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil_image)
+
+    bbox = draw.textbbox((0,0), text, font=font)
+
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    x = box_x + (box_w - text_w) // 2
+    y = box_y + (box_h - text_h) // 2 - 8
+
+    draw.text((x, y), text, font=font, fill=color)
+
+    return np.array(pil_image)
+    
+# ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
 
 # ==============================
 # RENDER CURRENT STROKE
@@ -211,38 +312,98 @@ while cap.isOpened():
         else:
             level = "HARD"
 
-        frame = draw_text(frame, f"LEVEL: {level}", (1000,70), 28, (0,255,255))
+        # ==============================
+        # PROGRESS PILL
+        # ==============================
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
 
-        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
+        frame = draw_centered_text(
+            frame,
+            f"{current}/{total}",
+            1120,
+            40,
+            115,
+            70,
+            24
+        )
+
+        # ==============================
+        # QUESTION BAR
+        # ==============================
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
+        )
 
         frame = draw_text(
             frame,
             q["question"],
-            (40, 30),
-            36,
+            (130, 50),
+            32,
             (255,255,255),
-            "Orbitron-Bold.ttf"
+            "Montserrat-SemiBold.ttf"
+        )
+
+        # ==============================
+        # LEVEL PILL
+        # ==============================
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
+
+        frame = draw_centered_text(
+            frame,
+            level,
+            1060,
+            90,
+            175,
+            70,
+            26
         )
 
         if lesson.feedback == "correct":
 
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                100
+            )
+
             frame = draw_text(
                 frame,
                 "Great Job!",
-                (40, 80),
-                30,
-                (0,255,0),
+                (105, 120),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
         elif lesson.feedback == "wrong":
 
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                100
+            )
+
             frame = draw_text(
                 frame,
-                "Wrong Shape! Try Again",
-                (40, 80),
-                30,
-                (0,0,255),
+                "Try Again",
+                (105, 120),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 

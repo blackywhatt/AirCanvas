@@ -6,7 +6,8 @@ import os
 from PIL import ImageFont, ImageDraw, Image
 from lesson_engine import LessonEngine
 
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
 hover_number = None
 hover_frames = 0
@@ -27,6 +28,39 @@ questions = [
 ]
 
 lesson = LessonEngine(questions)
+
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(question_bar,(900,110))
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(progress_pill,(115,70))
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(level_pill,(175,70))
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(correct_popup,(230,80))
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(wrong_popup,(260,80))
 
 def update_correct_sequence():
 
@@ -55,9 +89,9 @@ update_correct_sequence()
 # ==============================
 number_positions = {}
 
-start_x = 300
+start_x = 250
 for i, num in enumerate(numbers_str):
-    number_positions[num] = (start_x + i * 200, 350)
+    number_positions[num] = (start_x + i * 260, 340)
 
 # ==============================
 # Camera Setup
@@ -98,6 +132,58 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
     return np.array(img_pil)
 
 # ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
+
+def draw_centered_text(frame, text, box_x, box_y, box_w, box_h,
+                       size=30,
+                       color=(255,255,255),
+                       font_name="Montserrat-SemiBold.ttf"):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        return frame
+
+    pil_image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil_image)
+
+    bbox = draw.textbbox((0,0), text, font=font)
+
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    x = box_x + (box_w - text_w) // 2
+    y = box_y + (box_h - text_h) // 2 - 8
+
+    draw.text((x, y), text, font=font, fill=color)
+
+    return np.array(pil_image)
+
+# ==============================
 # Detect selection
 # ==============================
 def detect_selected_number(ix, iy):
@@ -126,6 +212,8 @@ while cap.isOpened():
     gesture,index_positions,thumb_positions,hand_count,frame = get_gesture(frame)
     lesson.update()
 
+    if answer_cooldown == 0:
+        feedback = None
     # ==============================
     # Draw Numbers
     # ==============================
@@ -133,33 +221,53 @@ while cap.isOpened():
 
         for num, (x, y) in number_positions.items():
 
-            if num in selected_sequence:
-                color = (0,255,0)
-            elif hover_number == num:
-                color = (0,255,255)
+            selected = num in selected_sequence
+            hovered = hover_number == num
+
+            radius = 72 if hovered else 62
+
+            if selected:
+                circle_color = (0,255,120)
+
+            elif hovered:
+                circle_color = (0,255,255)
+
             else:
-                color = (255,255,255)
+                circle_color = (255,255,255)
+
+            cv2.circle(
+                frame,
+                (x,y),
+                radius,
+                circle_color,
+                4,
+                cv2.LINE_AA
+            )
 
             frame = draw_text(
                 frame,
                 num,
-                (x - 15, y - 25),
-                48,
-                color,
+                (x - 18, y - 32),
+                52,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
     # ==============================
-    # Draw Progress
+    # ORDER DISPLAY
     # ==============================
     if not lesson.lesson_finished():
+
+        sequence_text = "  →  ".join(selected_sequence)
+
         frame = draw_text(
             frame,
-            "Your Order: " + " ".join(selected_sequence),
-            (40, 80),
-            30,
+            sequence_text,
+            (0, 500),
+            42,
             (0,255,255),
-            "Montserrat-Medium.ttf"
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     # ==============================
@@ -190,9 +298,9 @@ while cap.isOpened():
 
                 if selected_number == expected:
                     selected_sequence.append(selected_number)
-                    feedback = "correct_step"
 
                     if selected_sequence == correct_sequence:
+                        feedback = "correct_complete"
                         lesson.score += 1
                         lesson.current_question += 1
 
@@ -202,11 +310,11 @@ while cap.isOpened():
                             numbers = random.sample(range(1,6), 4)
                             numbers_str = [str(n) for n in numbers]
 
-                            start_x = 300
+                            start_x = 250
                             number_positions.clear()
 
                             for i, num in enumerate(numbers_str):
-                                number_positions[num] = (start_x + i * 200, 350)
+                                number_positions[num] = (start_x + i * 260, 340)
 
                             update_correct_sequence()
                 else:
@@ -220,28 +328,44 @@ while cap.isOpened():
     # ==============================
     # Feedback
     # ==============================
-    if feedback == "correct_step":
+    if feedback == "correct_complete":
+
+        frame = overlay_png(
+            frame,
+            correct_popup,
+            30,
+            120
+        )
+
         frame = draw_text(
             frame,
-            "Good!",
-            (40, 130),
-            30,
-            (0,255,0),
+            "Sequence Complete!",
+            (75, 140),
+            22,
+            (255,255,255),
             "Montserrat-SemiBold.ttf"
         )
 
     elif feedback == "wrong":
+
+        frame = overlay_png(
+            frame,
+            wrong_popup,
+            30,
+            120
+        )
+
         frame = draw_text(
             frame,
-            "Wrong Order! Try Again",
-            (40, 130),
-            30,
-            (0,0,255),
+            "Wrong Order",
+            (95, 140),
+            24,
+            (255,255,255),
             "Montserrat-SemiBold.ttf"
         )
 
     # ==============================
-    # Completed
+    # TOP UI + COMPLETE
     # ==============================
     if not lesson.lesson_finished():
 
@@ -255,42 +379,79 @@ while cap.isOpened():
         else:
             level = "HARD"
 
-        frame = draw_text(
+        # QUESTION BAR
+        frame = overlay_png(
             frame,
-            f"LEVEL: {level}",
-            (980, 30),
-            28,
-            (0,255,255),
-            "Montserrat-SemiBold.ttf"
+            question_bar,
+            25,
+            20
         )
 
         if q is not None:
+
             frame = draw_text(
                 frame,
                 q["question"],
-                (40, 30),
-                36,
+                (120, 50),
+                30,
                 (255,255,255),
-                "Orbitron-Bold.ttf"
+                "Montserrat-SemiBold.ttf"
             )
 
+        # PROGRESS
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
+
+        frame = draw_centered_text(
+            frame,
+            f"{current}/{total}",
+            1120,
+            40,
+            115,
+            70,
+            24
+        )
+
+        # LEVEL
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
+
+        frame = draw_centered_text(
+            frame,
+            level,
+            1060,
+            90,
+            175,
+            70,
+            26
+        )
+
     else:
+
         frame = draw_text(
             frame,
             "Lesson Complete!",
-            (0, 250),
-            60,
-            (0,255,255),
-            "Orbitron-Bold.ttf",
+            (0, 260),
+            42,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
             center=True
         )
 
         frame = draw_text(
             frame,
-            f"Score: {lesson.score}",
-            (0, 400),
-            36,
-            (255,255,255),
+            f"Score : {lesson.score}",
+            (0, 330),
+            30,
+            (220,220,220),
             "Montserrat-SemiBold.ttf",
             center=True
         )

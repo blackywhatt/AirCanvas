@@ -5,7 +5,8 @@ from lesson_engine import LessonEngine
 import os
 from PIL import ImageFont, ImageDraw, Image
 
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 hover_planet = None
 hover_frames = 0
 HOVER_THRESHOLD = 25
@@ -33,6 +34,54 @@ questions = [
 ]
 
 lesson = LessonEngine(questions)
+
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(
+    question_bar,
+    (900, 110)
+)
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(
+    progress_pill,
+    (115, 70)
+)
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(
+    level_pill,
+    (175, 70)
+)
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(
+    correct_popup,
+    (230, 80)
+)
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(
+    wrong_popup,
+    (230, 80)
+)
 
 # ==============================
 # Planet Positions
@@ -94,6 +143,58 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
         draw.text(pos, text, font=font, fill=color)
 
     return np.array(img_pil)
+
+def draw_centered_text(frame, text, box_x, box_y, box_w, box_h,
+                       size=30,
+                       color=(255,255,255),
+                       font_name="Montserrat-SemiBold.ttf"):
+
+    font_path = os.path.join(FONT_DIR, font_name)
+
+    try:
+        font = ImageFont.truetype(font_path, size)
+    except:
+        return frame
+
+    pil_image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(pil_image)
+
+    bbox = draw.textbbox((0,0), text, font=font)
+
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    x = box_x + (box_w - text_w) // 2
+    y = box_y + (box_h - text_h) // 2 - 8
+
+    draw.text((x, y), text, font=font, fill=color)
+
+    return np.array(pil_image)
+
+# ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
 
 # ==============================
 # Detect selection
@@ -160,13 +261,12 @@ def draw_planets(frame):
 
         highlight = (hover_planet == name)
 
-        if highlight:
-            cv2.circle(frame, (x, y), r+10, (0,255,255), 3)
+        display_r = int(r * 1.22) if highlight else r
 
         r = size_map[name]
 
         if name in planet_images:
-            size = r * 2
+            size = int(display_r * 2.2)
             frame = overlay_image(frame, planet_images[name], x, y, size)
         else:
             cv2.circle(frame, (x,y), r, color, -1)
@@ -228,35 +328,63 @@ while cap.isOpened():
         else:
             level = "HARD"
 
-        frame = draw_text(
+        # ==============================
+        # PROGRESS
+        # ==============================
+        frame = overlay_png(
             frame,
-            f"LEVEL: {level}",
-            (980,40),
-            28,
-            (0,255,255),
-            "Montserrat-SemiBold.ttf"
+            progress_pill,
+            1120,
+            40
         )
 
-        if q is None:
-            continue
-
-        frame = draw_text(
+        frame = draw_centered_text(
             frame,
-            f"Score: {lesson.score}",
-            (1100, 650),
-            24,
-            (255,255,255),
-            "Montserrat-Medium.ttf"
+            f"{current}/{total}",
+            1120,
+            40,
+            115,
+            70,
+            24
+        )
+
+        # ==============================
+        # LEVEL
+        # ==============================
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
+
+        frame = draw_centered_text(
+            frame,
+            level,
+            1060,
+            90,
+            175,
+            70,
+            26
+        )
+
+        # ==============================
+        # QUESTION BAR
+        # ==============================
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
         )
 
         frame = draw_text(
             frame,
             q["question"],
-            (0, 100),
-            36,
+            (120, 50),
+            30,
             (255,255,255),
-            "Orbitron-Bold.ttf",
-            center=True
+            "Montserrat-SemiBold.ttf"
         )
 
         if (
@@ -267,7 +395,8 @@ while cap.isOpened():
 
             ix, iy = index_positions[0]
 
-            cv2.circle(frame,(ix,iy),10,(0,255,255),-1)
+            cv2.circle(frame,(ix,iy),6,(255,255,255),-1,cv2.LINE_AA)
+            cv2.circle(frame,(ix,iy),14,(255,255,255),2,cv2.LINE_AA)
 
             selected = detect_selected_planet(ix, iy)
 
@@ -287,22 +416,38 @@ while cap.isOpened():
 
         # Feedback
         if lesson.feedback == "correct" and lesson.feedback_timer > 0:
+
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                120
+            )
+
             frame = draw_text(
                 frame,
                 "Correct!",
-                (40, 80),
-                30,
-                (0,255,0),
+                (105, 140),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
         elif lesson.feedback == "wrong" and lesson.feedback_timer > 0:
+
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                120
+            )
+
             frame = draw_text(
                 frame,
                 "Try Again",
-                (40, 80),
-                30,
-                (0,0,255),
+                (105, 140),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
@@ -310,19 +455,21 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Lesson Complete!",
-            (40, 30),
-            36,
-            (0,255,255),
-            "Orbitron-Bold.ttf"
+            (0, 260),
+            42,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
         frame = draw_text(
             frame,
-            f"Score: {lesson.score}",
-            (40, 80),
+            f"Score : {lesson.score}",
+            (0, 330),
             30,
-            (255,255,255),
-            "Montserrat-SemiBold.ttf"
+            (220,220,220),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     if answer_cooldown > 0:

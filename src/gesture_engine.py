@@ -41,6 +41,8 @@ two_hand_frames = 0
 TWO_HAND_STABLE = 1
 
 CONFIDENCE_THRESHOLD = 0.70
+DETECTION_MAX_WIDTH = 640
+
 # ==============================
 # MediaPipe Setup
 # ==============================
@@ -70,7 +72,15 @@ def get_gesture(frame):
 
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     rgb_frame.flags.writeable = False
-    result = hands.process(rgb_frame)
+
+    proc_w = min(DETECTION_MAX_WIDTH, w)
+    if proc_w != w:
+        proc_h = int(h * proc_w / w)
+        proc_frame = cv2.resize(rgb_frame, (proc_w, proc_h), interpolation=cv2.INTER_LINEAR)
+    else:
+        proc_frame = rgb_frame
+
+    result = hands.process(proc_frame)
     rgb_frame.flags.writeable = True
 
     if result.multi_hand_landmarks:

@@ -20,15 +20,18 @@ shape_start_angle = None
 
 hand_missing_frames = 0
 
-HAND_LOST_TOLERANCE = 3
+HAND_LOST_TOLERANCE = 1
 
 active_gesture = "none"
 gesture_memory = "none"
 gesture_hold_frames = 0
 
-GESTURE_STABILITY = 2
+GESTURE_STABILITY = 1
 
 last_ix, last_iy = 640, 360
+
+smooth_ix, smooth_iy = 640, 360
+CURSOR_SMOOTHING = 0.50
 
 # ERASE / ANIMATION VARIABLES
 erase_progress = 0
@@ -60,37 +63,85 @@ shape_start_ay = 0
 # UI ANIMATION
 pulse_frame = 0
 
-# FONT PATH
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+FONT_CACHE = {}
+TEXT_IMAGE_CACHE = {}
 
-# MODERN FONT TEXT DRAWING
+
+def get_font(font_name, size):
+    key = (font_name, size)
+    if key not in FONT_CACHE:
+        font_path = os.path.join(FONT_DIR, font_name)
+        try:
+            FONT_CACHE[key] = ImageFont.truetype(font_path, size)
+        except Exception:
+            FONT_CACHE[key] = ImageFont.load_default()
+    return FONT_CACHE[key]
+
+
+def render_text_image(text, size, color, font_name):
+    key = (text, size, color, font_name)
+    if key in TEXT_IMAGE_CACHE:
+        return TEXT_IMAGE_CACHE[key]
+
+    font = get_font(font_name, size)
+    dummy = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(dummy)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
+
+    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.text((-bbox[0], -bbox[1]), text, font=font, fill=(*color, 255))
+
+    arr = np.array(image)
+    TEXT_IMAGE_CACHE[key] = arr
+    return arr
+
+
 def draw_text(frame, text, pos, size=40, color=(255,255,255),
               font_name="Montserrat-Medium.ttf", center=False):
 
-    font_path = os.path.join(FONT_DIR, font_name)
+    if font_name and font_name.lower().endswith(".ttf"):
+        text_img = render_text_image(text, size, color, font_name)
+        x, y = pos
+        if center:
+            x = (frame.shape[1] - text_img.shape[1]) // 2
 
-    img_pil = Image.fromarray(frame)
-    draw = ImageDraw.Draw(img_pil)
+        h, w = frame.shape[:2]
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(w, x + text_img.shape[1])
+        y2 = min(h, y + text_img.shape[0])
 
-    try:
-        font = ImageFont.truetype(font_path, size)
-    except:
-        font = ImageFont.load_default()
+        if x2 <= x1 or y2 <= y1:
+            return frame
 
+        x_offset = x1 - x
+        y_offset = y1 - y
+        overlay = text_img[y_offset : y_offset + (y2 - y1),
+                           x_offset : x_offset + (x2 - x1)]
+        alpha = overlay[..., 3:4].astype(np.float32) / 255.0
+        text_rgb = overlay[..., :3][:, :, ::-1].astype(np.float32)
+
+        roi = frame[y1:y2, x1:x2].astype(np.float32)
+        blended = roi * (1 - alpha) + text_rgb * alpha
+        frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+        return frame
+
+    scale = max(0.4, size / 30.0)
+    thickness = 1 if scale < 0.9 else 2 if scale < 1.6 else 3
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    text_size, baseline = cv2.getTextSize(text, font, scale, thickness)
+    x, y = pos
     if center:
-        w, h = frame.shape[1], frame.shape[0]
-        bbox = draw.textbbox((0,0), text, font=font)
+        x = (frame.shape[1] - text_size[0]) // 2
+    y = y + text_size[1]
 
-        text_w = bbox[2] - bbox[0]
-        x = (w - text_w) // 2
-        y = pos[1]
-
-        draw.text((x,y), text, font=font, fill=color)
-
-    else:
-        draw.text(pos, text, font=font, fill=color)
-
-    return np.array(img_pil)
+    cv2.putText(frame, text, (x, y), font, scale, color, thickness, cv2.LINE_AA)
+    return frame
 
 # SESSION STORAGE SYSTEM
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -486,7 +537,9 @@ if __name__ == "__main__":
             break
 
         frame = cv2.flip(frame, 1)
-        frame = cv2.resize(frame, (1280, 720))
+        if frame.shape[1] != 1280 or frame.shape[0] != 720:
+            frame = cv2.resize(frame, (1280, 720))
+        
         h, w, _ = frame.shape
 
         gesture, index_positions, thumb_positions, hand_count, frame = get_gesture(frame)
@@ -494,6 +547,13 @@ if __name__ == "__main__":
         # reconstruct cursor + hand presence
         if hand_count >= 1:
             ix, iy = index_positions[0]
+
+            # smooth cursor movement
+            smooth_ix = int((1 - CURSOR_SMOOTHING) * smooth_ix + CURSOR_SMOOTHING * ix)
+            smooth_iy = int((1 - CURSOR_SMOOTHING) * smooth_iy + CURSOR_SMOOTHING * iy)
+
+            ix, iy = smooth_ix, smooth_iy
+
             landmarks_present = True
         else:
             landmarks_present = False
@@ -574,13 +634,15 @@ if __name__ == "__main__":
             )
 
         if landmarks_present:
-            closest_dist = SELECTION_RADIUS
+            closest_dist2 = SELECTION_RADIUS * SELECTION_RADIUS
             temp_idx = -1
 
             for i, s in enumerate(shapes_list):
-                dist = np.hypot(s.center[0] - ix, s.center[1] - iy)
-                if dist < closest_dist:
-                    closest_dist = dist
+                dx = s.center[0] - ix
+                dy = s.center[1] - iy
+                dist2 = dx * dx + dy * dy
+                if dist2 < closest_dist2:
+                    closest_dist2 = dist2
                     temp_idx = i
 
             # Select new shape ONLY when hovering close
@@ -588,7 +650,7 @@ if __name__ == "__main__":
                 selected_index = temp_idx
 
             if active_gesture == "erase" and selected_index != -1:
-                erase_progress += 6
+                erase_progress += 5
                 if erase_progress >= 100:
                     target_s = shapes_list.pop(selected_index)
                     imploding_shapes.append(target_s)
@@ -625,17 +687,18 @@ if __name__ == "__main__":
 
                             is_dragging = False
 
-
                         # ==========================
                         # MOVE (Grip Pose)
                         # ==========================
                         elif active_gesture == "move":
 
+                            cursor = np.array([ix, iy])
+
                             if not is_dragging:
-                                drag_offset = target_s.center - np.array([ix, iy])
+                                drag_offset = target_s.center - cursor
                                 is_dragging = True
 
-                            target_s.center = np.array([ix, iy]) + drag_offset
+                            target_s.center = cursor + drag_offset
 
                         # ==========================
                         # RESIZE (Pinch)

@@ -7,12 +7,69 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QTextEdit, QHBoxLayout, QFrame, QListWidget, 
                              QMessageBox, QInputDialog, QListWidgetItem)
 from PyQt6.QtCore import Qt
-
+from PyQt6.QtGui import QPixmap, QPainter, QColor
 from ui_components import AnimatedButton, LoadingScreen
 
-class GuideWindow(QWidget):
-    def __init__(self, parent_menu):
+class BackgroundWindow(QWidget):
+
+    def __init__(self, background_image="default_bg.png"):
         super().__init__()
+
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+
+        self.background_image = background_image
+
+        self.bg_label = QLabel(self)
+        self.bg_label.lower()
+
+    def resizeEvent(self, event):
+
+        pixmap = QPixmap(os.path.join(
+            self.base_path,
+            "..",
+            "assets",
+            self.background_image
+        ))
+
+        scaled = pixmap.scaled(
+            self.size(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
+        x = (scaled.width() - self.width()) // 2
+        y = (scaled.height() - self.height()) // 2
+
+        cropped = scaled.copy(
+            x,
+            y,
+            self.width(),
+            self.height()
+        )
+
+        dark_pixmap = QPixmap(self.size())
+        dark_pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(dark_pixmap)
+
+        painter.drawPixmap(0, 0, cropped)
+
+        painter.fillRect(
+            dark_pixmap.rect(),
+            QColor(0, 0, 0, 120)
+        )
+
+        painter.end()
+
+        self.bg_label.setPixmap(dark_pixmap)
+        self.bg_label.setGeometry(0, 0, self.width(), self.height())
+        self.bg_label.lower()
+
+        super().resizeEvent(event)
+
+class GuideWindow(BackgroundWindow):
+    def __init__(self, parent_menu):
+        super().__init__("canva1.png")
         self.parent_menu = parent_menu
 
         self.setWindowTitle("System Guide")
@@ -20,7 +77,6 @@ class GuideWindow(QWidget):
 
         self.setStyleSheet("""
             QWidget {
-                background-color: #0a0a0f;
                 color: white;
                 font-family: 'Montserrat';
             }
@@ -281,16 +337,15 @@ class GuideWindow(QWidget):
         self.parent_menu.show_desktop()
         event.accept()
 
-class SessionManagerWindow(QWidget):
+class SessionManagerWindow(BackgroundWindow):
     def __init__(self, parent_menu):
-        super().__init__()
+        super().__init__("canva.png")
         self.parent_menu = parent_menu
 
         self.setWindowTitle("Session Manager")
         self.showFullScreen()
         self.setStyleSheet("""
             QWidget {
-                background-color: #0a0a0f;
                 color: white;
                 font-family: 'Montserrat';
             }

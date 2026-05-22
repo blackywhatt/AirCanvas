@@ -6,35 +6,102 @@ from lesson_engine import LessonEngine
 import os
 from PIL import ImageFont, ImageDraw, Image
 
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
+ASSETS_DIR = os.path.join(BASE_DIR, "..", "assets")
 hover_number = None
 hover_frames = 0
+current_star_positions = []
+last_question_index = -1
 HOVER_THRESHOLD = 25
+
+# ==============================
+# LOAD OBJECT PNGS
+# ==============================
+object_images = {}
+
+for obj in ["star","ball","pizza","phone","door"]:
+
+    path = os.path.join(ASSETS_DIR, f"{obj}.png")
+
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+
+    if img is not None:
+        object_images[obj] = img
 
 # ==============================
 # Generate Questions (Dynamic)
 # ==============================
+object_types = [
+    "star",
+    "ball",
+    "pizza",
+    "phone",
+    "door"
+]
+
 questions = []
 
-for _ in range(5):
-    count = random.randint(1, 5)
+for _ in range(10):
+
+    obj = random.choice(object_types)
+    count = random.randint(1,5)
+
     questions.append({
-        "question": "How many apples?",
+        "question": f"Count the {obj}s",
         "answer": str(count),
-        "count": count
+        "count": count,
+        "object": obj
     })
 
+random.shuffle(questions)
+
 lesson = LessonEngine(questions)
+
+# ==============================
+# LOAD UI ASSETS
+# ==============================
+question_bar = cv2.imread(
+    "assets/ui/question_bar.png",
+    cv2.IMREAD_UNCHANGED
+)
+question_bar = cv2.resize(question_bar,(900,110))
+
+progress_pill = cv2.imread(
+    "assets/ui/progress_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+progress_pill = cv2.resize(progress_pill,(115,70))
+
+level_pill = cv2.imread(
+    "assets/ui/level_pill.png",
+    cv2.IMREAD_UNCHANGED
+)
+level_pill = cv2.resize(level_pill,(175,70))
+
+correct_popup = cv2.imread(
+    "assets/ui/correct_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+correct_popup = cv2.resize(correct_popup,(230,80))
+
+wrong_popup = cv2.imread(
+    "assets/ui/wrong_popup.png",
+    cv2.IMREAD_UNCHANGED
+)
+wrong_popup = cv2.resize(wrong_popup,(230,80))
 
 # ==============================
 # Number Positions (Answer Choices)
 # ==============================
 number_positions = {
-    "1": (300, 600),
-    "2": (500, 600),
-    "3": (700, 600),
-    "4": (900, 600),
-    "5": (1100, 600)
+
+    "1": (250,220),
+    "2": (450,220),
+    "3": (650,220),
+    "4": (850,220),
+    "5": (1050,220)
+
 }
 
 # ==============================
@@ -75,6 +142,31 @@ def draw_text(frame, text, pos, size=40, color=(255,255,255),
     return np.array(img_pil)
 
 # ==============================
+# PNG OVERLAY
+# ==============================
+def overlay_png(frame, png, x, y):
+
+    h, w = png.shape[:2]
+
+    if y + h > frame.shape[0] or x + w > frame.shape[1]:
+        return frame
+
+    b, g, r, a = cv2.split(png)
+
+    overlay_color = cv2.merge((b, g, r))
+
+    mask = a.astype(float) / 255.0
+    inverse_mask = 1.0 - mask
+
+    for c in range(3):
+        frame[y:y+h, x:x+w, c] = (
+            mask * overlay_color[:,:,c] +
+            inverse_mask * frame[y:y+h, x:x+w, c]
+        )
+
+    return frame
+
+# ==============================
 # Detect number selection
 # ==============================
 def detect_selected_number(ix, iy):
@@ -87,22 +179,42 @@ def detect_selected_number(ix, iy):
 
     return None
 
+def generate_object_positions(count):
+
+    positions = [
+        (420,420),
+        (620,420),
+        (820,420),
+
+        (520,560),
+        (720,560)
+    ]
+    random.shuffle(positions)
+    return positions[:count]
 
 # ==============================
-# Draw Apples (Objects)
+# Draw Objects
 # ==============================
-def draw_apples(frame, count):
+def draw_objects(frame, positions, object_name):
 
-    start_x = 300
-    y = 250
+    img = object_images[object_name]
 
-    for i in range(count):
-        x = start_x + i * 150
+    for x, y in positions:
 
-        # draw simple apple (circle)
-        cv2.circle(frame, (x, y), 40, (0,0,255), -1)
-        cv2.circle(frame, (x, y-50), 10, (0,255,0), -1)
+        resized = cv2.resize(img,(120,120))
 
+        h,w = resized.shape[:2]
+
+        x1 = x - w//2
+        y1 = y - h//2
+
+        alpha = resized[:,:,3] / 255.0
+
+        for c in range(3):
+            frame[y1:y1+h,x1:x1+w,c] = (
+                alpha * resized[:,:,c] +
+                (1-alpha) * frame[y1:y1+h,x1:x1+w,c]
+            )
 
 # ==============================
 # Main Loop
@@ -126,36 +238,107 @@ while cap.isOpened():
     if not lesson.lesson_finished():
 
         q = lesson.get_current_question()
+        if lesson.current_question != last_question_index:
+            current_star_positions = generate_object_positions(q["count"])
+            last_question_index = lesson.current_question
+        
         if q is None:
             continue
 
         current, total = lesson.get_progress()
-        frame = draw_text(frame, f"{current}/{total}", (1100,30), 30)
+        # ==============================
+        # LEVEL
+        # ==============================
+        if current <= 3:
+            level = "EASY"
+        elif current <= 6:
+            level = "MEDIUM"
+        else:
+            level = "HARD"
 
-        # draw question
+        # QUESTION BAR
+        frame = overlay_png(
+            frame,
+            question_bar,
+            25,
+            20
+        )
+
         frame = draw_text(
             frame,
             q["question"],
-            (40, 30),
-            36,
+            (130,50),
+            30,
             (255,255,255),
-            "Orbitron-Bold.ttf"
+            "Montserrat-SemiBold.ttf"
         )
 
-        # draw apples
-        draw_apples(frame, q["count"])
+        # PROGRESS
+        frame = overlay_png(
+            frame,
+            progress_pill,
+            1120,
+            40
+        )
 
-        # draw answer choices
+        frame = draw_text(
+            frame,
+            f"{current}/{total}",
+            (1150,56),
+            28,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+        )
+
+        # LEVEL
+        frame = overlay_png(
+            frame,
+            level_pill,
+            1060,
+            90
+        )
+
+        frame = draw_text(
+            frame,
+            level,
+            (1100,102),
+            28,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+        )
+
+        draw_objects(
+            frame,
+            current_star_positions,
+            q["object"]
+        )
+
+        # ==============================
+        # Draw Answer Choices
+        # ==============================
         for num, (x, y) in number_positions.items():
 
-            color = (0,255,255) if hover_number == num else (255,255,255)
+            hovered = (hover_number == num)
+
+            radius = 54 if hovered else 46
+
+            color = (0,255,255) if hovered else (255,255,255)
+
+            cv2.circle(
+                frame,
+                (x,y),
+                radius,
+                color,
+                3,
+                cv2.LINE_AA
+            )
 
             frame = draw_text(
                 frame,
                 num,
-                (x - 15, y - 25),
-                48,
-                color,
+                (x-14,y-26),
+                38,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
@@ -188,22 +371,38 @@ while cap.isOpened():
         # Feedback
         # ==============================
         if lesson.feedback == "correct":
+
+            frame = overlay_png(
+                frame,
+                correct_popup,
+                30,
+                100
+            )
+
             frame = draw_text(
                 frame,
                 "Correct!",
-                (40, 80),
-                30,
-                (0,255,0),
+                (105,120),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
         elif lesson.feedback == "wrong":
+
+            frame = overlay_png(
+                frame,
+                wrong_popup,
+                30,
+                100
+            )
+
             frame = draw_text(
                 frame,
                 "Try Again",
-                (40, 80),
-                30,
-                (0,0,255),
+                (105,120),
+                24,
+                (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
 
@@ -211,19 +410,21 @@ while cap.isOpened():
         frame = draw_text(
             frame,
             "Lesson Complete!",
-            (40, 30),
-            36,
-            (0,255,255),
-            "Orbitron-Bold.ttf"
+            (0,260),
+            42,
+            (255,255,255),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
         frame = draw_text(
             frame,
-            f"Score: {lesson.score}",
-            (40, 80),
+            f"Score : {lesson.score}",
+            (0,330),
             30,
-            (255,255,255),
-            "Montserrat-SemiBold.ttf"
+            (220,220,220),
+            "Montserrat-SemiBold.ttf",
+            center=True
         )
 
     # cooldown
