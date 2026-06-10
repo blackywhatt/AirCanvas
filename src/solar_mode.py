@@ -5,13 +5,13 @@ import json
 import os
 import sys
 # from datetime import datetime
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+sys.path.append(os.path.dirname(BASE_DIR))
 from gesture_engine import get_gesture
 from PIL import ImageFont, ImageDraw, Image
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
-sys.path.append(BASE_DIR)
-sys.path.append(os.path.dirname(BASE_DIR))
 
 FONT_CACHE = {}
 
@@ -32,6 +32,11 @@ RESET_HOLD_TIME = 1.5
 select_cooldown = 0
 SELECT_DELAY = 15   # frames between selections
 
+two_hand_frames = 0
+zoom_mode = False
+smooth_distance = None
+hud_badge_text = ""
+hud_badge_timer = 0
 # ==============================
 # SESSION STORAGE
 # ==============================
@@ -116,11 +121,35 @@ def draw_hud_panel(frame, lines, x, y, width, padding=14, bg_color=(20, 20, 40),
 
     line_y = y + padding
     for i, line in enumerate(lines):
-        size = 18 if i == 0 else 14
+        size = 20 if i == 0 else 16
         font_name = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
-        frame = draw_text(frame, line, (x + 12, line_y), size, (255,255,255), font_name)
-        line_y += 22
+        frame = draw_text(frame, line, (x + 16, line_y), size, (245,245,255), font_name)
+        line_y += 28
 
+    # left accent line
+    cv2.rectangle(frame, (x + 6, y + 10), (x + 10, y2 - 10), (80, 190, 255), -1)
+
+    return frame
+
+
+def draw_floating_badge(frame, text, alpha=1.0):
+    if not text:
+        return frame
+
+    # place pill in top-right corner to avoid overlapping title
+    h, w, _ = frame.shape
+    badge_w, badge_h = 200, 36
+    x = max(10, w - 220)
+    y = 20
+
+    overlay = frame.copy()
+    # pill background
+    cv2.rectangle(overlay, (x, y), (x + badge_w, y + badge_h), (18, 28, 38), -1)
+    cv2.addWeighted(overlay, 0.7 * alpha, frame, 1 - 0.7 * alpha, 0, frame)
+    # subtle border
+    cv2.rectangle(frame, (x, y), (x + badge_w, y + badge_h), (85, 190, 255), 1, cv2.LINE_AA)
+    # text
+    frame = draw_text(frame, text, (x + 14, y + 6), 16, (225, 235, 255), "Orbitron-Bold.ttf")
     return frame
 
 # ==============================
@@ -181,117 +210,122 @@ def draw_info_panel(frame, planet, px, py):
     cv2.rectangle(overlay,
                   (panel_x, panel_y),
                   (panel_x + width, panel_y + height),
-                  (30, 30, 30), -1)
+                  (14, 18, 28), -1)
 
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+    cv2.addWeighted(overlay, 0.68, frame, 0.32, 0, frame)
+
+    # subtle border
+    cv2.rectangle(frame, (panel_x, panel_y), (panel_x + width, panel_y + height), (80, 180, 255), 1, cv2.LINE_AA)
 
     # draw text
-    y_offset = panel_y + 25
+    y_offset = panel_y + 26
     for i, line in enumerate(lines):
 
-        size = 22 if i == 0 else 18
+        size = 24 if i == 0 else 18
         font_name = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
 
         frame = draw_text(
             frame,
             line,
-            (panel_x + 10, y_offset - 15),
+            (panel_x + 14, y_offset),
             size,
-            (255,255,255),
+            (235,235,245),
             font_name
         )
 
-        y_offset += 22
+        y_offset += 30
 
     return frame
-# ==============================
-# Save Function
-# ==============================
-# def save_session(session_name=None):
-#     global current_session_file
 
-#     if current_session_file is not None:
-#         filename = current_session_file
-#     else:
-#         if not session_name:
-#             session_name = "solar_session"
 
-#         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-#         filename = f"{session_name}_{timestamp}.json"
-#         current_session_file = filename
+def draw_info_card_fixed(frame, planet):
+    # fixed right-side info card to avoid overlapping planets
+    h, w, _ = frame.shape
+    card_w = 260
+    card_x = max(20, w - 280)
+    card_y = 20
 
-#     path = os.path.join(SESSION_FOLDER, filename)
+    lines = [
+        planet.get("name", ""),
+        f"Type: {planet.get('info', {}).get('type', '')}",
+        f"Moons: {planet.get('info', {}).get('moons', '')}",
+        f"Orbit: {planet.get('orbit', '')}",
+        f"Speed: {planet.get('speed', ''):.3f}" if 'speed' in planet else "",
+        planet.get('info', {}).get('fact', '')
+    ]
 
-#     planets_data = []
+    padding = 18
+    height = padding * 2 + len(lines) * 26
 
-#     for p in planets:
-#         planet_data = {
-#             "name": p["name"],
-#             "orbit": p["orbit"],
-#             "radius": p["radius"],
-#             "color": p["color"],
-#             "angle": p["angle"],
-#             "speed": p["speed"]
-#         }
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (card_x, card_y), (card_x + card_w, card_y + height), (12, 18, 30), -1)
+    cv2.addWeighted(overlay, 0.72, frame, 0.28, 0, frame)
 
-#         if "moon" in p:
-#             planet_data["moon"] = p["moon"]
+    cv2.rectangle(frame, (card_x, card_y), (card_x + card_w, card_y + height), (85, 190, 255), 1, cv2.LINE_AA)
 
-#         if "ring" in p:
-#             planet_data["ring"] = True
+    y = card_y + 18
+    for i, line in enumerate(lines):
+        if not line:
+            continue
+        size = 20 if i == 0 else 14
+        font = "Orbitron-Bold.ttf" if i == 0 else "Montserrat-Medium.ttf"
+        frame = draw_text(frame, line, (card_x + 14, y), size, (240,240,245), font)
+        y += 26
 
-#         if "info" in p:
-#             planet_data["info"] = p["info"]
+    return frame
 
-#         planets_data.append(planet_data)
 
-#     data = {
-#         "mode": "solar",
-#         "planets": planets_data,
-#         "solar_scale": solar_scale,
-#         "ax": ax,
-#         "ay": ay,
-#         "selected_index": selected_index,
-#         "simulation_speed": simulation_speed
-#     }
+def draw_left_status_panel(frame, selected_name, gesture, simulation_speed, zoom_mode):
+    # compact left status panel (top-left)
+    h, w, _ = frame.shape
+    panel_x, panel_y = 20, 20
+    panel_w = 180
 
-#     with open(path, "w") as f:
-#         json.dump(data, f)
+    # determine height dynamically
+    lines = ["SELECTED", selected_name]
 
-#     print(f"[INFO] Solar session saved: {filename}")
+    if zoom_mode:
 
-# ==============================
-# Load Function
-# ==============================
-# def load_session(filename):
-#     global planets, solar_scale, ax, ay, selected_index, simulation_speed, current_session_file
+        lines += ["ACTION", "ZOOM"]
 
-#     path = os.path.join(SESSION_FOLDER, filename)
+    elif gesture not in ["none", "idle"]:
 
-#     if not os.path.exists(path):
-#         return
+        display_gesture = {
+            "draw": "SELECT",
+            "resize": "ORBIT SPEED",
+            "erase": "RESET",
+            "rotate": "ROTATE"
+        }.get(gesture, gesture.upper())
 
-#     with open(path, "r") as f:
-#         data = json.load(f)
+        lines += ["ACTION", display_gesture]
 
-#     planets = data.get("planets", planets)
-#     solar_scale = data.get("solar_scale", 1.0)
-#     ax = data.get("ax", 0.0)
-#     ay = data.get("ay", 0.0)
-    
-#     selected_index = data.get("selected_index", 0)
-#     simulation_speed = data.get("simulation_speed", 1.0)
+        if gesture == "resize":
+            lines += ["ORBIT SPEED", f"{simulation_speed:.1f}x"]
 
-#     current_session_file = filename
+    padding = 12
+    height = padding * 2 + len(lines) * 28
 
-#     print(f"[INFO] Solar session loaded: {filename}")
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (panel_x, panel_y), (panel_x + panel_w, panel_y + height), (12, 16, 24), -1)
+    cv2.addWeighted(overlay, 0.72, frame, 0.28, 0, frame)
 
-# ==============================
-# Camera
-# ==============================
-# auto-load session if launched from menu
-# if len(sys.argv) > 2 and sys.argv[1] == "--load":
-#     load_session(sys.argv[2])
+    # left accent
+    cv2.rectangle(frame, (panel_x + 6, panel_y + 10), (panel_x + 10, panel_y + height - 10), (80, 190, 255), -1)
+
+    # render lines: label small, value large
+    y = panel_y + padding
+    i = 0
+    while i < len(lines):
+        label = lines[i]
+        value = lines[i+1] if i+1 < len(lines) else ""
+
+        frame = draw_text(frame, label, (panel_x + 16, y), 14, (180, 200, 220), "Montserrat-Medium.ttf")
+        y += 20
+        frame = draw_text(frame, value, (panel_x + 16, y), 18, (245, 245, 255), "Orbitron-Bold.ttf")
+        y += 34
+        i += 2
+
+    return frame
 
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # better quality on Windows
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -377,13 +411,25 @@ while cap.isOpened():
             prev_iy = None
 
         # ================= TWO HAND ZOOM =================
-        if hand_count == 2:
+        if hand_count == 2 and len(index_positions) >= 2:
 
-            (x1, y1), (x2, y2) = index_positions
+            (x1, y1), (x2, y2) = index_positions[:2]
 
             distance = np.hypot(x1 - x2, y1 - y2)
 
-            target_scale = np.interp(distance, [80, 400], [0.6, 2.5])
+            if smooth_distance is None:
+                smooth_distance = distance
+            else:
+                smooth_distance = smooth_distance * 0.9 + distance * 0.1
+
+            two_hand_frames += 1
+            if two_hand_frames >= 15:
+                zoom_mode = True
+                target_scale = np.interp(smooth_distance, [80, 400], [0.6, 2.5])
+        else:
+            two_hand_frames = 0
+            zoom_mode = False
+            smooth_distance = None
 
         # ================= SPEED CONTROL (PINCH) =================
         if gesture == "resize" and len(thumb_positions) > 0:
@@ -430,7 +476,7 @@ while cap.isOpened():
             frame = draw_text(
                 frame,
                 f"Hold to reset: {int(progress*100)}%",
-                (40, 120),
+                (20, 165),
                 24,
                 (0,150,255),
                 "Montserrat-SemiBold.ttf"
@@ -453,6 +499,29 @@ while cap.isOpened():
         select_cooldown -= 1
 
     # ==============================
+    # Floating Badge / Status Indicator
+    badge_text = None
+    if zoom_mode:
+        badge_text = "ZOOM MODE"
+    elif gesture != "none":
+        if gesture == "draw":
+            badge_text = "SELECT"
+        elif gesture == "erase":
+            badge_text = "RESET"
+        elif gesture == "resize":
+            badge_text = "ORBIT SPEED"
+        elif gesture == "rotate":
+            badge_text = "ROTATE"
+        else:
+            badge_text = gesture.upper()
+
+    if badge_text:
+        hud_badge_text = badge_text
+        hud_badge_timer = 30
+    elif hud_badge_timer > 0:
+        hud_badge_timer -= 1
+
+    # ==============================
     # Smooth Zoom (LERP)
     # ==============================
     zoom_smooth = 0.12
@@ -466,25 +535,6 @@ while cap.isOpened():
 
     vx *= rotation_damping
     vy *= rotation_damping
-
-    # ==============================
-    # Draw Orbits (WORLD SPACE → PROJECT)
-    # ==============================
-    # for p in planets:
-    #     if p["orbit"] > 0:
-    #         orbit = p["orbit"] * solar_scale
-
-    #         orbit_pts = []
-    #         for deg in range(0, 360, 5):
-    #             rad = np.radians(deg)
-
-    #             x = np.cos(rad) * orbit
-    #             y = np.sin(rad) * orbit
-
-    #             px, py, _ = project_3d(x + w // 2, y + h // 2, 0, w, h, ax, ay)
-    #             orbit_pts.append((px, py))
-
-    #         cv2.polylines(frame, [np.array(orbit_pts)], True, (80, 80, 80), 1, cv2.LINE_AA)
 
     for i, p in enumerate(planets):
 
@@ -503,9 +553,9 @@ while cap.isOpened():
                 px, py, _ = project_3d(x + w // 2, y + h // 2, 0, w, h, ax, ay)
                 orbit_pts.append((px, py))
 
-            # Highlight selected orbit
+            # Highlight selected orbit (soft cyan)
             if i == selected_index:
-                color = (0, 255, 255)   # bright yellow
+                color = (100, 220, 200)   # soft cyan
                 thickness = 2
             else:
                 color = (80, 80, 80)
@@ -580,6 +630,14 @@ while cap.isOpened():
             int(base_color[2] * brightness)
         )
 
+        display_radius = radius + 4 if i == selected_index else radius
+        if i == selected_index:
+            glow_radius = radius + 10
+            overlay = frame.copy()
+            # reduced glow opacity for subtle highlight
+            cv2.circle(overlay, (px, py), glow_radius, (70, 175, 240), -1)
+            cv2.addWeighted(overlay, 0.08, frame, 0.92, 0, frame)
+
         # Draw orbit trail
         for trail_angle in orbit_trails[i]:
 
@@ -595,7 +653,7 @@ while cap.isOpened():
 
             cv2.circle(frame, (tpx, tpy), 2, (brightness,brightness,brightness), -1)
 
-        cv2.circle(frame, (px, py), radius, color, -1, cv2.LINE_AA)
+        cv2.circle(frame, (px, py), display_radius, color, -1, cv2.LINE_AA)
 
         # 🪐 SATURN RING
         if "ring" in p:
@@ -656,41 +714,40 @@ while cap.isOpened():
 
             cv2.circle(frame, (mpx, mpy), moon["radius"], moon["color"], -1)
 
-        # label selected planet
+        # selected planet actions: draw fixed info card on the right (avoid floating labels)
         if i == selected_index:
-            frame = draw_text(
-                frame,
-                p["name"],
-                (px - 40, py - radius - 30),
-                26,
-                (255,255,255),
-                "Montserrat-SemiBold.ttf"
-            )
-
-        if i == selected_index:
-            frame = draw_info_panel(frame, p, px, py)
+            frame = draw_info_card_fixed(frame, p)
     # ==============================
     # HUD
     # ==============================
     hud_lines = [
-        "SOLAR SYSTEM MODE",
-        f"SELECTED: {planets[selected_index]['name']}",
-        f"TIME SCALE: {simulation_speed:.1f}x",
-        f"GESTURE: {gesture.upper() if gesture != 'none' else 'WAITING'}",
-        f"HANDS: {hand_count}"
+        f"Selected: {planets[selected_index]['name']}"
     ]
-    frame = draw_hud_panel(frame, hud_lines, 20, 20, 300)
+    if gesture != "none":
+        display_gesture = {
+            "draw": "SELECT",
+            "erase": "RESET",
+            "resize": "ORBIT SPEED",
+            "rotate": "ROTATE"
+        }.get(gesture, gesture.upper())
+        hud_lines.append(f"Gesture: {display_gesture}")
+        if gesture == "resize":
+            hud_lines.append(f"Orbit Speed: {simulation_speed:.1f}x")
 
-    frame = draw_hud_panel(
+    frame = draw_left_status_panel(frame, planets[selected_index]['name'], gesture, simulation_speed, zoom_mode)
+
+    # compact top-center title
+    frame = draw_text(
         frame,
-        ["Rotate | Zoom | Select | Reset | Speed"],
-        20,
-        h - 50,
-        500,
-        padding=6,
-        bg_color=(14, 14, 32),
-        alpha=0.45
+        "SOLAR SYSTEM",
+        (w // 2, 20),
+        30,
+        (245, 245, 245),
+        "Orbitron-Bold.ttf",
+        center=True
     )
+
+    # frame = draw_floating_badge(frame, hud_badge_text, min(1.0, hud_badge_timer / 30.0))
 
     # ==============================
     # Show Frame

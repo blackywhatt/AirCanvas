@@ -15,7 +15,7 @@ MODEL_PATH = os.path.join(BASE_PATH, "model")
 vosk_model = Model(MODEL_PATH)
 FONT_DIR = os.path.join(BASE_PATH, "fonts")
 
-list_of_commands = '["circle", "square", "triangle", "select circle", "select square", "select triangle", "red", "green", "blue", "clear", "reset", "delete shape", "bigger", "smaller", "left", "right", "up", "down", "three d", "two d", "rotate", "next shape", "previous shape", "[unk]"]'
+list_of_commands = '["circle", "square", "triangle", "diamond", "pentagon", "star", "select circle", "select square", "select triangle", "red", "green", "blue", "clear", "reset", "delete shape", "bigger", "smaller", "left", "right", "up", "down", "three d", "two d", "rotate", "next shape", "previous shape", "[unk]"]'
 rec = KaldiRecognizer(vosk_model, 16000, list_of_commands)
 audio_queue = queue.Queue()
 
@@ -50,6 +50,8 @@ class liveShape:
     def __init__(self, w, h):
         self.type = None
         self.size = 100
+        self.draw_progress = 0
+        self.is_animating = True
         self.x = w // 2
         self.y = h // 2
         self.color = (255, 0, 0)
@@ -84,7 +86,11 @@ def start_voice_mode():
     current_shape = None
     selected_index = -1
     pulse = 0 
-    THICKNESS_SELECTED = 6
+    last_command = ""
+    assistant_message = ""
+    assistant_timer = 0
+    command_timer = 0
+    THICKNESS_SELECTED = 8
     THICKNESS_NORMAL = 2
 
     # --- DESKTOP MAXIMIZED UI SETUP ---
@@ -97,28 +103,56 @@ def start_voice_mode():
         
         while True:
             pulse += 1
-            if current_shape and current_shape.is_rotating:
-                current_shape.angle += 0.008
+            for shape in shapes:
+
+                if shape.is_animating:
+
+                    shape.draw_progress += 5
+
+                    if shape.draw_progress >= 100:
+                        shape.draw_progress = 100
+                        shape.is_animating = False
+
+            for shape in shapes:
+
+                if shape.is_rotating:
+                    shape.angle += 0.010
 
             while not audio_queue.empty():
                 data = audio_queue.get()
                 if rec.AcceptWaveform(data):
                     result = json.loads(rec.Result())
                     command = result['text'].lower()
+                    if command:
+                        last_command = command.upper()
+                        command_timer = 60
                     
                     if command:
-                        if command in ["circle", "square", "triangle"]:
+                        if command in ["circle", "square", "triangle", "diamond", "pentagon", "star"]:
                             new_shape = liveShape(W, H)
                             new_shape.type = command
                             shapes.append(new_shape)
                             selected_index = len(shapes) - 1
                             current_shape = shapes[selected_index]
+                            assistant_message = f"{command.title()} Created"
+                            assistant_timer = 60
                         elif "three d" in command and current_shape:
                             current_shape.is_3d = True
+                            assistant_message = "3D Mode Enabled"
+                            assistant_timer = 60
                         elif "two d" in command and current_shape:
                             current_shape.is_3d = False
+                            assistant_message = "2D Mode Enabled"
+                            assistant_timer = 60
                         elif "rotate" in command and current_shape:
                             current_shape.is_rotating = not current_shape.is_rotating
+                            assistant_message = (
+                                "Rotation Enabled"
+                                if current_shape.is_rotating
+                                else "Rotation Disabled"
+                            )
+
+                            assistant_timer = 60
                         elif "bigger" in command and current_shape:
                             current_shape.size = min(current_shape.size + 40, 400)
                         elif "smaller" in command and current_shape:
@@ -202,30 +236,323 @@ def start_voice_mode():
                 if shape.type:
                     if not shape.is_3d:
                         if shape.type == "circle":
-                            cv2.circle(frame, (cx, cy), s, shape.color, thickness)
+                            if shape.is_animating:
+                                angle = int(360 * shape.draw_progress / 100)
+
+                                cv2.ellipse(
+                                    frame,
+                                    (cx, cy),
+                                    (s, s),
+                                    0,
+                                    0,
+                                    angle,
+                                    shape.color,
+                                    thickness,
+                                    cv2.LINE_AA
+                                )
+
+                            else:
+                                cv2.circle(frame, (cx, cy), s, shape.color, thickness)
+                                
                         elif shape.type == "square":
-                            cv2.rectangle(frame, (cx-s, cy-s), (cx+s, cy+s), shape.color, thickness)
+                            if shape.is_animating:
+                                p = shape.draw_progress
+                                x1 = cx - s
+                                y1 = cy - s
+                                x2 = cx + s
+                                y2 = cy + s
+                                # Top edge
+                                if p > 0:
+                                    end_x = int(x1 + (x2 - x1) * min(p, 25) / 25)
+                                    cv2.line(
+                                        frame,
+                                        (x1, y1),
+                                        (end_x, y1),
+                                        shape.color,
+                                        thickness
+                                    )
+                                # Right edge
+                                if p > 25:
+                                    end_y = int(y1 + (y2 - y1) * min(p-25, 25) / 25)
+                                    cv2.line(
+                                        frame,
+                                        (x2, y1),
+                                        (x2, end_y),
+                                        shape.color,
+                                        thickness
+                                    )
+                                # Bottom edge
+                                if p > 50:
+                                    start_x = int(x2 - (x2 - x1) * min(p-50, 25) / 25)
+                                    cv2.line(
+                                        frame,
+                                        (x2, y2),
+                                        (start_x, y2),
+                                        shape.color,
+                                        thickness
+                                    )
+                                # Left edge
+                                if p > 75:
+                                    start_y = int(y2 - (y2 - y1) * min(p-75, 25) / 25)
+                                    cv2.line(
+                                        frame,
+                                        (x1, y2),
+                                        (x1, start_y),
+                                        shape.color,
+                                        thickness
+                                    )
+                            else:
+                                cv2.rectangle(
+                                    frame,
+                                    (cx-s, cy-s),
+                                    (cx+s, cy+s),
+                                    shape.color,
+                                    thickness
+                                )
+
                         elif shape.type == "triangle":
-                            pts = np.array([[cx, cy-s], [cx-s, cy+s], [cx+s, cy+s]], np.int32)
-                            cv2.polylines(frame, [pts], True, shape.color, thickness)
+
+                            if shape.is_animating:
+
+                                p = shape.draw_progress
+
+                                top = (cx, cy - s)
+                                left = (cx - s, cy + s)
+                                right = (cx + s, cy + s)
+
+                                # Edge 1: top -> left
+                                if p > 0:
+
+                                    progress = min(p, 33) / 33
+
+                                    end_x = int(top[0] + (left[0] - top[0]) * progress)
+                                    end_y = int(top[1] + (left[1] - top[1]) * progress)
+
+                                    cv2.line(
+                                        frame,
+                                        top,
+                                        (end_x, end_y),
+                                        shape.color,
+                                        thickness
+                                    )
+
+                                # Edge 2: left -> right
+                                if p > 33:
+
+                                    progress = min(p - 33, 33) / 33
+
+                                    end_x = int(left[0] + (right[0] - left[0]) * progress)
+                                    end_y = int(left[1] + (right[1] - left[1]) * progress)
+
+                                    cv2.line(
+                                        frame,
+                                        left,
+                                        (end_x, end_y),
+                                        shape.color,
+                                        thickness
+                                    )
+
+                                # Edge 3: right -> top
+                                if p > 66:
+
+                                    progress = min(p - 66, 34) / 34
+
+                                    end_x = int(right[0] + (top[0] - right[0]) * progress)
+                                    end_y = int(right[1] + (top[1] - right[1]) * progress)
+
+                                    cv2.line(
+                                        frame,
+                                        right,
+                                        (end_x, end_y),
+                                        shape.color,
+                                        thickness
+                                    )
+
+                            else:
+
+                                pts = np.array([
+                                    [cx, cy-s],
+                                    [cx-s, cy+s],
+                                    [cx+s, cy+s]
+                                ], np.int32)
+
+                                cv2.polylines(
+                                    frame,
+                                    [pts],
+                                    True,
+                                    shape.color,
+                                    thickness
+                                )
+                        elif shape.type == "diamond":
+
+                            pts = [
+                                (cx, cy - s),   # top
+                                (cx + s, cy),   # right
+                                (cx, cy + s),   # bottom
+                                (cx - s, cy)    # left
+                            ]
+
+                            if shape.is_animating:
+
+                                p = shape.draw_progress
+
+                                edges_to_draw = int((p / 100) * 4)
+
+                                for edge in range(edges_to_draw):
+
+                                    start = pts[edge]
+                                    end = pts[(edge + 1) % 4]
+
+                                    cv2.line(
+                                        frame,
+                                        start,
+                                        end,
+                                        shape.color,
+                                        thickness
+                                    )
+
+                            else:
+
+                                cv2.polylines(
+                                    frame,
+                                    [np.array(pts)],
+                                    True,
+                                    shape.color,
+                                    thickness
+                                )
+                        
+                        elif shape.type == "pentagon":
+
+                            pts = []
+
+                            for k in range(5):
+
+                                angle = np.radians(-90 + k * 72)
+
+                                x = int(cx + s * np.cos(angle))
+                                y = int(cy + s * np.sin(angle))
+
+                                pts.append((x, y))
+
+                            if shape.is_animating:
+
+                                p = shape.draw_progress
+
+                                edges_to_draw = int((p / 100) * 5)
+
+                                for edge in range(edges_to_draw):
+
+                                    start = pts[edge]
+                                    end = pts[(edge + 1) % 5]
+
+                                    cv2.line(
+                                        frame,
+                                        start,
+                                        end,
+                                        shape.color,
+                                        thickness
+                                    )
+
+                            else:
+
+                                cv2.polylines(
+                                    frame,
+                                    [np.array(pts)],
+                                    True,
+                                    shape.color,
+                                    thickness
+                                )
+
+                        elif shape.type == "star":
+
+                            pts = []
+
+                            for k in range(10):
+
+                                angle = np.radians(-90 + k * 36)
+
+                                r = s if k % 2 == 0 else s * 0.45
+
+                                x = int(cx + r * np.cos(angle))
+                                y = int(cy + r * np.sin(angle))
+
+                                pts.append((x, y))
+
+                            if shape.is_animating:
+
+                                p = shape.draw_progress
+
+                                edges_to_draw = int((p / 100) * 10)
+
+                                for edge in range(edges_to_draw):
+
+                                    start = pts[edge]
+                                    end = pts[(edge + 1) % 10]
+
+                                    cv2.line(
+                                        frame,
+                                        start,
+                                        end,
+                                        shape.color,
+                                        thickness
+                                    )
+
+                            else:
+
+                                cv2.polylines(
+                                    frame,
+                                    [np.array(pts)],
+                                    True,
+                                    shape.color,
+                                    thickness
+                                )
+
                     else:
                         if shape.type == "circle":
-                            # Draw vertical 'longitude' loops
-                            for i in range(0, 180, 30):
+
+                            # Outer sphere
+                            cv2.circle(
+                                frame,
+                                (cx, cy),
+                                s,
+                                shape.color,
+                                2,
+                                cv2.LINE_AA
+                            )
+
+                            # Rotating vertical rings
+                            for i in range(0, 180, 45):
+
                                 rad = math.radians(i)
-                                # The width of the ellipse changes based on rotation + loop angle
+
                                 w_factor = abs(math.cos(shape.angle + rad))
-                                cv2.ellipse(frame, (cx, cy), (int(s * w_factor), s), 0, 0, 360, shape.color, 2, cv2.LINE_AA)
-                            
-                            # Draw horizontal 'latitude' loops
-                            for i in range(-s, s, s//3):
-                                if i == 0: continue # Skip the middle one if you want
-                                # Calculate the width of the sphere at this height
-                                h_dist = abs(i)
-                                lat_w = int(math.sqrt(max(0, s**2 - h_dist**2)))
-                                # Perspective tilt for the horizontal loops
-                                lat_h = int(lat_w * 0.2 * math.sin(shape.angle))
-                                cv2.ellipse(frame, (cx, cy + i), (lat_w, abs(lat_h)), 0, 0, 360, shape.color, 1, cv2.LINE_AA)
+
+                                cv2.ellipse(
+                                    frame,
+                                    (cx, cy),
+                                    (max(1, int(s * w_factor)), s),
+                                    0,
+                                    0,
+                                    360,
+                                    shape.color,
+                                    1,
+                                    cv2.LINE_AA
+                                )
+
+                            # Moving equator
+                            tilt = int(25 * math.sin(shape.angle))
+
+                            cv2.ellipse(
+                                frame,
+                                (cx, cy),
+                                (s, max(3, abs(tilt))),
+                                0,
+                                0,
+                                360,
+                                shape.color,
+                                2,
+                                cv2.LINE_AA
+                            )
                         elif shape.type == "square": 
                             nodes = [(-s,-s,-s), (s,-s,-s), (s,s,-s), (-s,s,-s), (-s,-s,s), (s,-s,s), (s,s,s), (-s,s,s)]
                             p = [project_3d(n[0], n[1], n[2], cx, cy, shape.angle) for n in nodes]
@@ -240,6 +567,164 @@ def start_voice_mode():
                             for i in range(4):
                                 cv2.line(frame, base[i], base[(i+1)%4], shape.color, 2)
                                 cv2.line(frame, tip, base[i], shape.color, 3)
+                        elif shape.type == "diamond":
+
+                            nodes = [
+                                (-s, -s//3, -s//2),
+                                ( s, -s//3, -s//2),
+                                ( s, -s//3,  s//2),
+                                (-s, -s//3,  s//2),
+                                (-s*1.3, 0, -s*0.7),
+                                ( s*1.3, 0, -s*0.7),
+                                ( s*1.3, 0,  s*0.7),
+                                (-s*1.3, 0,  s*0.7),
+                                (0, int(s*1.8), 0)
+                            ]
+
+                            p = [
+                                project_3d(
+                                    n[0], n[1], n[2],
+                                    cx, cy,
+                                    shape.angle
+                                )
+                                for n in nodes
+                            ]
+
+                            edges = [
+                                (0,1),(1,2),(2,3),(3,0),
+                                (0,4),(1,5),(2,6),(3,7),
+                                (4,5),(5,6),(6,7),(7,4),
+                                (4,8),
+                                (5,8),
+                                (6,8),
+                                (7,8)
+                            ]
+
+                            for a, b in edges:
+                                cv2.line(
+                                    frame,
+                                    p[a],
+                                    p[b],
+                                    shape.color,
+                                    2
+                                )
+                        
+                        elif shape.type == "pentagon":
+
+                            front = []
+                            back = []
+
+                            depth = int(s * 0.6)
+
+                            for k in range(5):
+
+                                angle = np.radians(-90 + k * 72)
+
+                                x = int(s * np.cos(angle))
+                                y = int(s * np.sin(angle))
+
+                                front.append(
+                                    project_3d(
+                                        x, y, depth,
+                                        cx, cy,
+                                        shape.angle
+                                    )
+                                )
+
+                                back.append(
+                                    project_3d(
+                                        x, y, -depth,
+                                        cx, cy,
+                                        shape.angle
+                                    )
+                                )
+
+                            # Front face
+                            cv2.polylines(
+                                frame,
+                                [np.array(front)],
+                                True,
+                                shape.color,
+                                2
+                            )
+
+                            # Back face
+                            cv2.polylines(
+                                frame,
+                                [np.array(back)],
+                                True,
+                                shape.color,
+                                1
+                            )
+
+                            # Connect faces
+                            for i in range(5):
+
+                                cv2.line(
+                                    frame,
+                                    front[i],
+                                    back[i],
+                                    shape.color,
+                                    2
+                                )
+
+                        elif shape.type == "star":
+
+                            front = []
+                            back = []
+
+                            depth = int(s * 0.5)
+
+                            for k in range(10):
+
+                                angle = np.radians(-90 + k * 36)
+
+                                r = s if k % 2 == 0 else s * 0.45
+
+                                x = int(r * np.cos(angle))
+                                y = int(r * np.sin(angle))
+
+                                front.append(
+                                    project_3d(
+                                        x, y, depth,
+                                        cx, cy,
+                                        shape.angle
+                                    )
+                                )
+
+                                back.append(
+                                    project_3d(
+                                        x, y, -depth,
+                                        cx, cy,
+                                        shape.angle
+                                    )
+                                )
+
+                            cv2.polylines(
+                                frame,
+                                [np.array(front)],
+                                True,
+                                shape.color,
+                                2
+                            )
+
+                            cv2.polylines(
+                                frame,
+                                [np.array(back)],
+                                True,
+                                shape.color,
+                                1
+                            )
+
+                            for i in range(10):
+
+                                cv2.line(
+                                    frame,
+                                    front[i],
+                                    back[i],
+                                    shape.color,
+                                    2
+                                )
 
             # --- GUI OVERLAY ---
             overlay = frame.copy()
@@ -256,6 +741,41 @@ def start_voice_mode():
                 (255,255,255),
                 "Montserrat-SemiBold.ttf"
             )
+
+            if command_timer > 0:
+
+                frame = draw_text(
+                    frame,
+                    "LAST COMMAND",
+                    (20, 95),
+                    16,
+                    (150, 180, 220),
+                    "Montserrat-Medium.ttf"
+                )
+
+                frame = draw_text(
+                    frame,
+                    f'"{last_command}"',
+                    (20, 120),
+                    24,
+                    (0,255,255),
+                    "Orbitron-Bold.ttf"
+                )
+
+                command_timer -= 1
+
+            if assistant_timer > 0:
+
+                frame = draw_text(
+                    frame,
+                    f"{assistant_message}",
+                    (20, 170),
+                    22,
+                    (0,255,120),
+                    "Montserrat-SemiBold.ttf"
+                )
+
+                assistant_timer -= 1
 
             if current_shape:
                 view_mode = "3D" if current_shape.is_3d else "2D"

@@ -193,7 +193,12 @@ def draw_ui_accent(frame, active_gesture, depth_val):
     # green accent
     cv2.rectangle(frame, (x1, y1), (x1+4, y2), (0,255,0), -1)
 
-    gesture_label = "WAITING" if active_gesture == "none" else active_gesture.upper()
+    if active_gesture == "none":
+        gesture_label = "WAITING"
+    elif active_gesture == "clear":
+        gesture_label = "LOCK"
+    else:
+        gesture_label = active_gesture.upper()
 
     frame = draw_text(
         frame,
@@ -220,31 +225,6 @@ def draw_ui_accent(frame, active_gesture, depth_val):
     indicator_y = y1 + panel_h // 2
 
     cv2.circle(frame, (indicator_x, indicator_y), pulse_radius, (0,255,0), -1)
-
-    # DEPTH BAR
-    bar_top = 160
-    bar_bottom = h - 160
-
-    cv2.rectangle(frame, (w-70, bar_top), (w-50, bar_bottom), (35,35,35), -1)
-
-    fill_h = int((bar_bottom - bar_top) * depth_val)
-
-    cv2.rectangle(
-        frame,
-        (w-70, bar_bottom),
-        (w-50, bar_bottom - fill_h),
-        (0,255,0),
-        -1
-    )
-
-    frame = draw_text(
-        frame,
-        "DEPTH",
-        (w-90, bar_top-35),
-        18,
-        (170,170,170),
-        "Montserrat-Medium.ttf"
-    )
 
     return frame
 
@@ -366,6 +346,52 @@ def generate_regular_polygon(center, radius, sides):
 
     return np.array(pts)
 
+def _angle_between(p0, p1, p2):
+    v0 = p0 - p1
+    v1 = p2 - p1
+    norm0 = np.linalg.norm(v0)
+    norm1 = np.linalg.norm(v1)
+    if norm0 == 0 or norm1 == 0:
+        return 0.0
+    cos_val = np.clip(np.dot(v0, v1) / (norm0 * norm1), -1.0, 1.0)
+    return np.arccos(cos_val)
+
+
+def _is_regular_polygon(approx, side_tolerance=0.45, angle_tolerance=0.45):
+    pts = approx.reshape(-1, 2).astype(np.float32)
+    sides = np.linalg.norm(np.roll(pts, -1, axis=0) - pts, axis=1)
+    if np.min(sides) < 15:
+        return False
+
+    mean_side = np.mean(sides)
+    if np.max(np.abs(sides - mean_side)) / mean_side > side_tolerance:
+        return False
+
+    angles = [
+        _angle_between(pts[i - 1], pts[i], pts[(i + 1) % len(pts)])
+        for i in range(len(pts))
+    ]
+    mean_angle = np.mean(angles)
+    if mean_angle == 0:
+        return False
+
+    if np.max(np.abs(angles - mean_angle)) / mean_angle > angle_tolerance:
+        return False
+
+    return True
+
+def _is_rectangle(approx, angle_tolerance=0.35):
+    pts = approx.reshape(-1, 2).astype(np.float32)
+    if len(pts) != 4:
+        return False
+
+    angles = [
+        _angle_between(pts[i - 1], pts[i], pts[(i + 1) % 4])
+        for i in range(4)
+    ]
+    return all(abs(angle - np.pi / 2) < angle_tolerance for angle in angles)
+
+
 def get_perfect_shape(points):
     if len(points) < 5:
         return None
@@ -382,23 +408,30 @@ def get_perfect_shape(points):
         if peri > 0:
             circularity = (4 * np.pi * area) / (peri * peri)
 
-        approx = cv2.approxPolyDP(cnt, 0.03 * peri, True)
+        approx = cv2.approxPolyDP(cnt, 0.025 * peri, True)
 
         # CIRCLE FIRST (strict)
-        if circularity >= 0.76:
+        if circularity >= 0.80 and len(approx) > 5:
             (x, y), r = cv2.minEnclosingCircle(cnt)
             return Circle((int(x), int(y)), int(r))
 
         # TRIANGLE
-        elif len(approx) == 3:
+        elif len(approx) == 3 and _is_regular_polygon(approx, side_tolerance=0.50, angle_tolerance=0.50):
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 3)
             return Polygon(pts, "triangle")
 
         # 4 SIDES
-        elif len(approx) == 4:
+        elif len(approx) == 4 and _is_rectangle(approx):
+
+            pts_raw = approx.reshape(4, 2).astype(np.float32)
+
+            side1 = np.linalg.norm(pts_raw[0] - pts_raw[1])
+            side2 = np.linalg.norm(pts_raw[1] - pts_raw[2])
+
+            ratio = max(side1, side2) / min(side1, side2)
+
             x, y, w, h = cv2.boundingRect(cnt)
-            aspect_ratio = w / float(h)
 
             pts = np.array([
                 [x, y],
@@ -407,19 +440,19 @@ def get_perfect_shape(points):
                 [x, y+h]
             ])
 
-            if 0.88 <= aspect_ratio <= 1.12:
+            if ratio <= 1.15:
                 return Polygon(pts, "square")
             else:
                 return Polygon(pts, "rectangle")
 
         # PENTAGON
-        elif len(approx) == 5:
+        elif len(approx) == 5 and _is_regular_polygon(approx):
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 5)
             return Polygon(pts, "pentagon")
 
         # HEXAGON
-        elif len(approx) == 6:
+        elif len(approx) == 6 and _is_regular_polygon(approx):
             (x, y), r = cv2.minEnclosingCircle(cnt)
             pts = generate_regular_polygon((x, y), r, 6)
             return Polygon(pts, "hexagon")
@@ -430,6 +463,7 @@ def get_perfect_shape(points):
             return Polygon(pts, "star")
 
         return None
+
 
 def save_session(session_name=None):
     global current_session_file
