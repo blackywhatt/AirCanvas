@@ -56,7 +56,7 @@ class liveShape:
         self.y = h // 2
         self.color = (255, 0, 0)
         self.color_name = "Blue"
-        self.step = 80 
+        self.step = 100 
         self.is_3d = False 
         self.angle = 0.5 
         self.is_rotating = False

@@ -327,7 +327,8 @@ def draw_left_status_panel(frame, selected_name, gesture, simulation_speed, zoom
 
     return frame
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # better quality on Windows
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # better quality on Windows
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FPS, 30)
