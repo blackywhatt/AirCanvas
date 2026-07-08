@@ -280,12 +280,15 @@ class HandModuleWindow(BackgroundWindow):
         layout.addWidget(back_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def start_shapes_mode(self):
+        print("START SHAPES CLICKED")
         self.launch_module("shapes_mode.py")
 
     def start_draw_mode(self):
+        print("START DRAW CLICKED")
         self.launch_module("draw_mode.py")
 
     def start_solar_mode(self):
+        print("START SOLAR CLICKED")
         self.launch_module("solar_mode.py")
 
     def launch_module(self, filename):
@@ -293,6 +296,11 @@ class HandModuleWindow(BackgroundWindow):
             os.path.dirname(os.path.abspath(__file__)),
             filename
         )
+        
+        print("Script path:", script_path)
+        print("Exists:", os.path.exists(script_path))
+        print("Running from:", os.path.dirname(os.path.abspath(__file__)))
+
         messages = {
             "shapes_mode.py": "Entering Shape Adventure...",
             "draw_mode.py": "Opening Creative Drawing Studio...",
